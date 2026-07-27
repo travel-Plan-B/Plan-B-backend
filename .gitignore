@@ -221,4 +221,5 @@ __marimo__/
 .DS_Store
 
 # PyCharm
-.idea/test_*.sh
+.idea
+test_*.sh
