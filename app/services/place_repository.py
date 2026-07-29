@@ -1,33 +1,26 @@
+import asyncio
 import math
 from datetime import datetime, timedelta
-from app.models.place import Place
+
+from app.core.category_duration import get_default_duration
 from app.ingest_places import ingest
-
-from app.services.category_map import CATEGORY_TAG_TO_CONTENTTYPE, CATEGORY_TAG_TO_CAT3
-from app.services.tourapi_service import fetch_tourapi_places_by_category
+from app.models.place import Place
 from app.services.category_map import (
-    CATEGORY_TAG_TO_CONTENTTYPE,
     CATEGORY_TAG_TO_CAT3,
+    CATEGORY_TAG_TO_CONTENTTYPE,
+    TOURAPI_CAT3_CATEGORY_MAP,
     TOURAPI_CAT3_EXCLUDE,
+    TOURAPI_CONTENTTYPE_MAP,
 )
-
-from app.core.category_duration import get_default_duration
-from app.services.category_map import TOURAPI_CAT3_CATEGORY_MAP, TOURAPI_CONTENTTYPE_MAP
-
-import asyncio
 from app.services.kakao_mobility_service import get_travel_time
-from app.core.category_duration import get_default_duration
-from app.services.category_map import TOURAPI_CAT3_CATEGORY_MAP, TOURAPI_CONTENTTYPE_MAP
-
-
-
+from app.services.tourapi_service import fetch_tourapi_places_by_category
 
 STALE_DAYS = 30
 
 
 def _bounding_box(lat: float, lng: float, radius_km: float):
     """좌표+반경을 대략적인 사각형(최소/최대 위경도)으로 변환."""
-    lat_delta = radius_km / 111.0 
+    lat_delta = radius_km / 111.0
     lng_delta = radius_km / (111.0 * max(0.1, abs(math.cos(math.radians(lat)))))
     return lat - lat_delta, lat + lat_delta, lng - lng_delta, lng + lng_delta
 
@@ -51,8 +44,8 @@ async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10
         return existing
 
     print("[CACHE MISS] 데이터 없거나 오래됨 → 새로 수집")
-    await ingest(db, lat, lng)   
-    db.commit()                 
+    await ingest(db, lat, lng)
+    db.commit()
 
     return (
         db.query(Place)
@@ -63,12 +56,9 @@ async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10
         .all()
     )
 
+
 async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict], int]:
-    original = (
-        db.query(Place)
-        .filter_by(source=source, source_id=place_id)
-        .first()
-    )
+    original = db.query(Place).filter_by(source=source, source_id=place_id).first()
     if original is None:
         return [], 0
 
@@ -98,6 +88,7 @@ async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict]
 
     return places, used_radius
 
+
 def filter_by_duration(places: list[dict], available_minutes: int) -> list[dict]:
     """카테고리 기본 체류시간이 이용가능시간 안에 들어오는 곳만 필터링."""
     if available_minutes <= 0:
@@ -105,11 +96,14 @@ def filter_by_duration(places: list[dict], available_minutes: int) -> list[dict]
 
     filtered = []
     for p in places:
-        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(p.get("cat3")) or TOURAPI_CONTENTTYPE_MAP.get(p.get("contenttypeid"))
+        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(p.get("cat3")) or TOURAPI_CONTENTTYPE_MAP.get(
+            p.get("contenttypeid")
+        )
         duration = get_default_duration(category_tag) if category_tag else 30
         if duration <= available_minutes:
             filtered.append(p)
     return filtered
+
 
 async def get_detail_recommendations(
     db,
@@ -141,7 +135,9 @@ async def get_detail_recommendations(
             travel_to_next = result["travel_minutes"] if result else None
 
         cat3 = item.get("cat3")
-        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(item.get("contenttypeid"))
+        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(
+            item.get("contenttypeid")
+        )
 
         return {
             "place_id": item.get("contentid"),
@@ -152,17 +148,21 @@ async def get_detail_recommendations(
             "lng": lng,
             "travel_time_from_prev_minutes": travel_from_prev,
             "travel_time_to_next_minutes": travel_to_next,
-            "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
+            "estimated_duration_minutes": (
+                get_default_duration(category_tag) if category_tag else 30
+            ),
         }
 
     # 여러 후보의 이동시간을 동시에 계산 (순차 호출 방지)
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
 
     if priority == "MINIMIZE_TRAVEL":
+
         def total_travel(p):
             a = p["travel_time_from_prev_minutes"] or 0
             b = p["travel_time_to_next_minutes"] or 0
             return a + b
+
         enriched.sort(key=total_travel)
     # SIMILAR_TO_ORIGINAL, EXPLORE_NEW은 일단 원래 순서(거리순) 유지 - 추후 다듬을 부분
 

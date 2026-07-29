@@ -1,4 +1,6 @@
-def filter_by_category_whitelist(places, problem_reason: str, situational_answer: str | None = None):
+def filter_by_category_whitelist(
+    places, problem_reason: str, situational_answer: str | None = None
+):
     """문제 사유에 맞는 카테고리만 필터링. 시간 문제일 땐 카테고리 제한 없음."""
     if problem_reason == "WEATHER":
         if situational_answer in ("OUTDOOR_ONLY", "BOTH"):

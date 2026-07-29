@@ -1,10 +1,13 @@
 import httpx
+
 from app.core.config import settings
 
 DIRECTIONS_URL = "https://apis-navi.kakaomobility.com/v1/directions"
 
 
-async def get_travel_time(origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float) -> dict | None:
+async def get_travel_time(
+    origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float
+) -> dict | None:
     """두 좌표 간 자동차 이동시간(분)과 거리(km) 계산. 실패 시 None."""
     headers = {"Authorization": f"KakaoAK {settings.KAKAO_REST_API_KEY}"}
     params = {

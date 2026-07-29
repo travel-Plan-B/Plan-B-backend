@@ -15,3 +15,14 @@ test-google:
 
 test-repo:
 	python3 -m app.test.test_repository
+
+format:
+	black app/
+
+lint:
+	ruff check app/
+
+typecheck:
+	mypy app/
+
+check: format lint typecheck

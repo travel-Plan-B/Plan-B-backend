@@ -1,6 +1,6 @@
-from app.services.time_service import calculate_available_minutes
 from app.core.category_duration import get_default_duration
 from app.services.place_repository import filter_by_duration
+from app.services.time_service import calculate_available_minutes
 
 
 def main():
@@ -16,8 +16,8 @@ def main():
 
     # 3. 시간 필터링 테스트 (임의 데이터로)
     fake_places = [
-        {"cat3": "A05020900", "contenttypeid": "39", "title": "카페A"},       # 카페, 40분
-        {"cat3": None, "contenttypeid": "14", "title": "박물관A"},            # 문화시설, 60분
+        {"cat3": "A05020900", "contenttypeid": "39", "title": "카페A"},  # 카페, 40분
+        {"cat3": None, "contenttypeid": "14", "title": "박물관A"},  # 문화시설, 60분
     ]
     filtered = filter_by_duration(fake_places, available_minutes=available)
     print(f"\n필터링 결과 ({available}분 안에 가능한 곳):")

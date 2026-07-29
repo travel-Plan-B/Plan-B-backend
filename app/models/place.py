@@ -1,7 +1,18 @@
 from sqlalchemy import (
-    Column, BigInteger, String, Boolean, Float, Text,
-    Numeric, Integer, DateTime, UniqueConstraint, Index, func
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
+
 from app.core.database import Base
 
 
@@ -10,7 +21,7 @@ class Place(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
 
-    source = Column(String(20), nullable=False)          # tourapi | google
+    source = Column(String(20), nullable=False)  # tourapi | google
     source_id = Column(String(100), nullable=False)
 
     name = Column(String(200), nullable=False)

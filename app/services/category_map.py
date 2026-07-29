@@ -16,19 +16,19 @@ CATEGORY_TAG_TO_CONTENTTYPE = {
 
 # TourAPI cat3(세부 카테고리) -> 내부 표준 category_tag (contenttypeid보다 우선 적용)
 TOURAPI_CAT3_CATEGORY_MAP = {
-    "A05020900": "카페",       # 카페/전통찻집
-    "A02020600": "문화시설",    # 박물관
-    "A02020700": "문화시설",    # 미술관/전시관
-    "A02020900": "문화시설",    # 공연장
+    "A05020900": "카페",  # 카페/전통찻집
+    "A02020600": "문화시설",  # 박물관
+    "A02020700": "문화시설",  # 미술관/전시관
+    "A02020900": "문화시설",  # 공연장
 }
 
 # TourAPI cat3 -> 실내 여부 추정
 TOURAPI_INDOOR_HINTS = {
-    "A02020600": True,   # 박물관
-    "A02020700": True,   # 미술관/전시관 계열
-    "A02020900": True,   # 공연장
-    "A05020900": True,   # 카페
-    "A05020100": True,   # 한식 등 식당류
+    "A02020600": True,  # 박물관
+    "A02020700": True,  # 미술관/전시관 계열
+    "A02020900": True,  # 공연장
+    "A05020900": True,  # 카페
+    "A05020100": True,  # 한식 등 식당류
 }
 
 TOURAPI_CAT3_EXCLUDE = {
@@ -111,7 +111,9 @@ def infer_indoor_by_name(name: str | None) -> bool | None:
     return None
 
 
-def infer_indoor(source: str, raw_value: str, cat1: str | None = None, name: str | None = None) -> bool | None:
+def infer_indoor(
+    source: str, raw_value: str, cat1: str | None = None, name: str | None = None
+) -> bool | None:
     """카테고리 코드 기준으로 실내 여부 추정. 판단 불가하면 None.
     우선순위: 정확한 cat3 매핑 > cat1(대분류) > 이름 키워드"""
     if source == "tourapi":

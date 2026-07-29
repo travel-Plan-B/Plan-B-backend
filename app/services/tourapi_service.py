@@ -1,4 +1,5 @@
 import httpx
+
 from app.core.config import settings
 
 TOURAPI_BASE_URL = "https://apis.data.go.kr/B551011/KorService2/locationBasedList2"

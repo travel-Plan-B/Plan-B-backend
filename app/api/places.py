@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+
 from app.core.database import get_db
+from app.ingest_places import upsert_place
+from app.services.kakao_service import search_kakao_place
+from app.services.normalize_service import normalize_kakao_place
 from app.services.place_repository import get_or_ingest_places
-from app.services.tourapi_service import fetch_tourapi_places_by_category
-from app.services.tourapi_service import fetch_tourapi_places_expanding, fetch_tourapi_places_by_category
+from app.services.tourapi_service import (
+    fetch_tourapi_places_by_category,
+)
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -35,11 +40,14 @@ async def debug_places(
         ],
     }
 
+
 @router.get("/debug-by-category")
 async def debug_places_by_category(
     lat: float = Query(..., description="위도"),
     lng: float = Query(..., description="경도"),
-    content_type_id: str = Query(..., description="TourAPI 대분류 코드 (예: 14=문화시설, 39=음식점)"),
+    content_type_id: str = Query(
+        ..., description="TourAPI 대분류 코드 (예: 14=문화시설, 39=음식점)"
+    ),
 ):
     """[확인용] 디테일탭 - 카테고리 지정 검색이 잘 도는지 확인하는 임시 엔드포인트."""
     places, used_radius = await fetch_tourapi_places_by_category(
@@ -55,9 +63,6 @@ async def debug_places_by_category(
         ],
     }
 
-from app.services.kakao_service import search_kakao_place
-from app.services.normalize_service import normalize_kakao_place
-from app.ingest_places import upsert_place
 
 
 @router.get("/search")
@@ -83,4 +88,3 @@ async def search_places(
         "count": len(saved_places),
         "places": saved_places,
     }
-

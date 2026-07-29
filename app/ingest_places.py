@@ -1,18 +1,15 @@
 import asyncio
 from datetime import datetime
+
 from app.core.database import SessionLocal
 from app.models.place import Place
-from app.services.tourapi_service import fetch_tourapi_places_expanding
 from app.services.google_places_service import enrich_with_google_rating
 from app.services.normalize_service import normalize_tourapi_place
+from app.services.tourapi_service import fetch_tourapi_places_expanding
 
 
 def upsert_place(db, data: dict):
-    existing = (
-        db.query(Place)
-        .filter_by(source=data["source"], source_id=data["source_id"])
-        .first()
-    )
+    existing = db.query(Place).filter_by(source=data["source"], source_id=data["source_id"]).first()
     if existing:
         for key, value in data.items():
             setattr(existing, key, value)
@@ -49,6 +46,7 @@ async def ingest(db, lat: float, lng: float):
 
 
 if __name__ == "__main__":
+
     async def _standalone_run():
         db = SessionLocal()
         await ingest(db, lat=37.8227690565604, lng=127.095012085337)

@@ -1,4 +1,5 @@
 import httpx
+
 from app.core.config import settings
 
 KAKAO_KEYWORD_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
