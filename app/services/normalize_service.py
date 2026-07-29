@@ -16,7 +16,7 @@ def normalize_tourapi_place(item: dict) -> dict | None:
         "name": item.get("title"),
         "address": item.get("addr1"),
         "category_tag": category_tag,
-        "is_indoor": infer_indoor("tourapi", cat3),
+        "is_indoor": infer_indoor("tourapi", cat3, cat1=item.get("cat1"), name=item.get("title")),
         "lat": float(item.get("mapy")),
         "lng": float(item.get("mapx")),
         "image_url": item.get("firstimage") or None,

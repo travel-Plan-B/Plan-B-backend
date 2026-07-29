@@ -72,10 +72,12 @@ GOOGLE_INDOOR_TYPE_MAP = {
     "natural_feature": False,
 }
 
-GOOGLE_EXCLUDE_TYPES = {
-    "hotel", "lodging", "store", "discount_store", "government_office",
-    "city_hall", "local_government_office",
-}
+
+# A01(자연) 계열은 명백히 실외로 간주
+NATURE_CAT1 = {"A01"}
+
+INDOOR_NAME_KEYWORDS = ["레스토랑", "카페", "센터", "박물관", "전시관", "체험관", "회관"]
+OUTDOOR_NAME_KEYWORDS = ["공원", "계곡", "숲", "휴양림", "전망대", "둘레길", "마을"]
 
 
 def map_category(item, source: str) -> str | None:
@@ -91,10 +93,34 @@ def map_category(item, source: str) -> str | None:
     return None
 
 
-def infer_indoor(source: str, raw_value: str) -> bool | None:
-    """카테고리 코드 기준으로 실내 여부 추정. 판단 불가하면 None."""
+def infer_indoor_by_cat1(cat1: str | None) -> bool | None:
+    """cat1(대분류) 기준 실내 여부 추정. 명확한 경우만 판단."""
+    if cat1 in NATURE_CAT1:
+        return False
+    return None
+
+
+def infer_indoor_by_name(name: str | None) -> bool | None:
+    """이름에 포함된 키워드로 실내 여부 보조 추정."""
+    if not name:
+        return None
+    if any(kw in name for kw in INDOOR_NAME_KEYWORDS):
+        return True
+    if any(kw in name for kw in OUTDOOR_NAME_KEYWORDS):
+        return False
+    return None
+
+
+def infer_indoor(source: str, raw_value: str, cat1: str | None = None, name: str | None = None) -> bool | None:
+    """카테고리 코드 기준으로 실내 여부 추정. 판단 불가하면 None.
+    우선순위: 정확한 cat3 매핑 > cat1(대분류) > 이름 키워드"""
     if source == "tourapi":
-        return TOURAPI_INDOOR_HINTS.get(raw_value)
+        if raw_value in TOURAPI_INDOOR_HINTS:
+            return TOURAPI_INDOOR_HINTS[raw_value]
+        result = infer_indoor_by_cat1(cat1)
+        if result is not None:
+            return result
+        return infer_indoor_by_name(name)
     if source == "google":
         return GOOGLE_INDOOR_TYPE_MAP.get(raw_value)
     return None
