@@ -1,4 +1,5 @@
 import httpx
+from typing import Any
 
 from app.core.config import settings
 
@@ -9,8 +10,7 @@ TOURAPI_BASE_URL = "https://apis.data.go.kr/B551011/KorService2/locationBasedLis
 async def fetch_tourapi_places(
     lat: float, lng: float, radius: int = 1000, content_type_id: str | None = None
 ) -> list[dict]:
-    """TourAPI 위치기반 관광정보 조회. content_type_id 지정하면 그 대분류로 좁혀서 검색."""
-    params = {
+    params: dict[str, Any] = {
         "serviceKey": settings.TOUR_API_KEY,
         "MobileOS": "ETC",
         "MobileApp": "PlanB",
