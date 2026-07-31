@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     KMA_SERVICE_KEY: str = ""
     TOUR_API_KEY: str = ""
     GOOGLE_PLACES_API_KEY: str = ""
-
+    CLAUDE_API_KEY: str = ""
+    
     class Config:
         env_file = ".env"
 
