@@ -27,7 +27,7 @@ async def recommend_detail(request: DetailRecommendRequest, db: Session = Depend
     prev = request.prev_item_location.dict() if request.prev_item_location else None
     next_loc = request.next_item_location.dict() if request.next_item_location else None
 
-    candidates = await get_detail_recommendations(
+    result = await get_detail_recommendations(
         db,
         place_id=request.place_id,
         source=request.source,
@@ -38,5 +38,6 @@ async def recommend_detail(request: DetailRecommendRequest, db: Session = Depend
 
     return {
         "item_id": request.item_id,
-        "candidates": candidates,
+        "ai_recommended": result["ai_recommended"],
+        "more_places": result["more_places"],
     }

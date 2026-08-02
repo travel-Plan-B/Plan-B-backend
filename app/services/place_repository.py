@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from app.core.category_duration import get_default_duration
 from app.ingest_places import ingest
 from app.models.place import Place
+from app.services.ai_recommend_service import get_ai_final_pick
 from app.services.category_map import (
     CATEGORY_TAG_TO_CAT3,
     CATEGORY_TAG_TO_CONTENTTYPE,
@@ -12,6 +13,7 @@ from app.services.category_map import (
     TOURAPI_CAT3_EXCLUDE,
     TOURAPI_CONTENTTYPE_MAP,
 )
+from app.services.google_places_service import enrich_with_google_rating
 from app.services.kakao_mobility_service import get_travel_time
 from app.services.tourapi_service import fetch_tourapi_places_by_category
 
@@ -73,7 +75,7 @@ async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict]
         return [], 0
 
     places, used_radius = await fetch_tourapi_places_by_category(
-        lat=original.lat, lng=original.lng, content_type_id=content_type_id
+        lat=original.lat, lng=original.lng, content_type_id=content_type_id, target_count=30
     )
 
     if category_tag in CATEGORY_TAG_TO_CAT3:
@@ -113,16 +115,13 @@ async def get_detail_recommendations(
     next_location: dict | None,
     priority: str = "MINIMIZE_TRAVEL",
     max_candidates: int = 10,
-) -> list[dict]:
-    """디테일탭 - 카테고리 필터링 + 양방향 이동시간 + 기본 체류시간까지 붙여서 최종 후보 반환."""
+) -> dict:
+    """디테일탭 - 카테고리 필터링 + 양방향 이동시간 + 기본 체류시간 + AI 최종 선택까지."""
     raw_places, _ = await get_similar_places(db, place_id, source)
-
-    # 이동시간 계산 비용을 줄이기 위해, 거리순 상위 일부만 처리
     raw_places = raw_places[:max_candidates]
 
     async def enrich(item: dict) -> dict:
         lat, lng = float(item["mapy"]), float(item["mapx"])
-
         travel_from_prev = None
         travel_to_next = None
 
@@ -134,6 +133,10 @@ async def get_detail_recommendations(
             result = await get_travel_time(lat, lng, next_location["lat"], next_location["lng"])
             travel_to_next = result["travel_minutes"] if result else None
 
+        google_data = await enrich_with_google_rating(name=item.get("title"), lat=lat, lng=lng)
+        rating = google_data["rating"] if google_data else None
+        user_rating_count = google_data["user_rating_count"] if google_data else None
+
         cat3 = item.get("cat3")
         category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(
             item.get("contenttypeid")
@@ -144,6 +147,8 @@ async def get_detail_recommendations(
             "name": item.get("title"),
             "address": item.get("addr1"),
             "category_tag": category_tag,
+            "rating": rating,
+            "user_rating_count": user_rating_count,
             "lat": lat,
             "lng": lng,
             "travel_time_from_prev_minutes": travel_from_prev,
@@ -153,17 +158,47 @@ async def get_detail_recommendations(
             ),
         }
 
-    # 여러 후보의 이동시간을 동시에 계산 (순차 호출 방지)
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
 
     if priority == "MINIMIZE_TRAVEL":
 
         def total_travel(p):
-            a = p["travel_time_from_prev_minutes"] or 0
-            b = p["travel_time_to_next_minutes"] or 0
-            return a + b
+            return (p["travel_time_from_prev_minutes"] or 0) + (
+                p["travel_time_to_next_minutes"] or 0
+            )
 
         enriched.sort(key=total_travel)
-    # SIMILAR_TO_ORIGINAL, EXPLORE_NEW은 일단 원래 순서(거리순) 유지 - 추후 다듬을 부분
+    elif priority == "SIMILAR_TO_ORIGINAL":
+        # (여기서는 세부적으로 원본과 완전히 동일한 category_tag를 우선하는 정도의 의미)
+        original_place = db.query(Place).filter_by(source=source, source_id=place_id).first()
+        original_category = original_place.category_tag if original_place else None
+        enriched.sort(key=lambda p: p["category_tag"] != original_category)
+    # EXPLORE_NEW는 현재 get_similar_places()가 동일 카테고리로만 검색하는 구조라
+    # 실질적인 차별화가 어려워 별도 정렬 없이 원래 순서(거리순) 유지 - 추후 검색 범위 확장 시 재검토
 
-    return enriched
+    # AI 최종 선택
+    priority_text = {
+        "MINIMIZE_TRAVEL": "이동 시간이 가장 짧은 곳을 우선으로 선택해주세요.",
+        "SIMILAR_TO_ORIGINAL": "원래 장소와 성격이 비슷한 곳을 우선으로 선택해주세요.",
+        "EXPLORE_NEW": "평소와는 다른 새로운 느낌의 장소를 우선으로 선택해주세요.",
+    }.get(priority, "이동 시간이 가장 짧은 곳을 우선으로 선택해주세요.")
+
+    situation = {
+        "situation_description": f"일정 속 장소를 대체할 곳을 찾고 있습니다. {priority_text}",
+        "available_minutes": None,
+    }
+    ai_result = await get_ai_final_pick(enriched, situation)
+
+    if ai_result:
+        reason_map = {r["place_id"]: r["reason"] for r in ai_result}
+        ai_recommended = [d for d in enriched if d["place_id"] in reason_map]
+        for d in ai_recommended:
+            d["recommend_reason"] = reason_map[d["place_id"]]
+        more_places = [d for d in enriched if d["place_id"] not in reason_map]
+    else:
+        for d in enriched:
+            d["recommend_reason"] = None
+        ai_recommended = enriched[:3]
+        more_places = enriched[3:]
+
+    return {"ai_recommended": ai_recommended, "more_places": more_places}

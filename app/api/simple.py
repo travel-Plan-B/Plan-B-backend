@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.services.ai_recommend_service import get_ai_final_pick
 from app.services.kakao_mobility_service import get_travel_time
 from app.services.place_repository import get_or_ingest_places
 from app.services.simple_service import (
@@ -13,7 +14,6 @@ from app.services.simple_service import (
     sort_places,
 )
 from app.services.time_service import calculate_available_minutes
-from app.services.ai_recommend_service import get_ai_final_pick
 
 router = APIRouter(prefix="/simple", tags=["simple"])
 
@@ -38,14 +38,23 @@ class SimpleRecommendRequest(BaseModel):
 async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depends(get_db)):
     # 1. 장소 이용불가 + "아니요"면 추천 없이 종료
     if request.problem_reason == "PLACE_UNAVAILABLE" and request.situational_answer == "NO":
-        return {"success": True, "data": {"ai_recommended": [], "more_places": [], "no_candidates_reason": "USER_DECLINED"}}
+        return {
+            "success": True,
+            "data": {
+                "ai_recommended": [],
+                "more_places": [],
+                "no_candidates_reason": "USER_DECLINED",
+            },
+        }
 
     # 2. 다음 일정까지 이동시간 계산 (있으면)
     travel_to_next = 0
     if request.next_place:
         result = await get_travel_time(
-            request.current_location.lat, request.current_location.lng,
-            request.next_place.lat, request.next_place.lng,
+            request.current_location.lat,
+            request.current_location.lng,
+            request.next_place.lat,
+            request.next_place.lng,
         )
         travel_to_next = result["travel_minutes"] if result else 0
 
@@ -58,13 +67,23 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
         db, lat=request.current_location.lat, lng=request.current_location.lng
     )
 
-    places = filter_by_category_whitelist(places, request.problem_reason, request.situational_answer)
+    places = filter_by_category_whitelist(
+        places, request.problem_reason, request.situational_answer
+    )
 
     places = filter_by_duration_simple(places, available_minutes)
 
     if not places:
         reason = "NOT_ENOUGH_TIME" if available_minutes <= 0 else "NO_SUITABLE_PLACE"
-        return {"success": True, "data": {"available_minutes": available_minutes, "ai_recommended": [], "more_places": [], "no_candidates_reason": reason}}
+        return {
+            "success": True,
+            "data": {
+                "available_minutes": available_minutes,
+                "ai_recommended": [],
+                "more_places": [],
+                "no_candidates_reason": reason,
+            },
+        }
 
     places = await enrich_with_travel_time(
         places, request.current_location.lat, request.current_location.lng

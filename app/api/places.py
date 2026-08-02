@@ -64,7 +64,6 @@ async def debug_places_by_category(
     }
 
 
-
 @router.get("/search")
 async def search_places(
     query: str = Query(..., description="장소명 또는 주소"),

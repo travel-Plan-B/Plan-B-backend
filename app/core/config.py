@@ -8,9 +8,9 @@ class Settings(BaseSettings):
     TOUR_API_KEY: str = ""
     GOOGLE_PLACES_API_KEY: str = ""
     CLAUDE_API_KEY: str = ""
-    
+
     class Config:
         env_file = ".env"
 
 
-settings = Settings() # type: ignore
+settings = Settings()  # type: ignore

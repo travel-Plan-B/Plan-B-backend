@@ -29,8 +29,6 @@ def normalize_tourapi_place(item: dict) -> dict | None:
     }
 
 
-
-
 def normalize_kakao_place(item: dict) -> dict | None:
     """카카오 검색 결과를 Place 테이블 스키마로 변환. 카테고리 매핑 안 되면 None."""
     category_tag = map_category(item, source="kakao")
