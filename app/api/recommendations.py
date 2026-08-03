@@ -20,6 +20,7 @@ class DetailRecommendRequest(BaseModel):
     prev_item_location: Location | None = None
     next_item_location: Location | None = None
     priority: str = "MINIMIZE_TRAVEL"
+    transport: str = "CAR"
 
 
 @router.post("/detail")

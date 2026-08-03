@@ -126,11 +126,11 @@ async def get_detail_recommendations(
         travel_to_next = None
 
         if prev_location:
-            result = await get_travel_time(prev_location["lat"], prev_location["lng"], lat, lng)
+            result = await get_travel_time(prev_location["lat"], prev_location["lng"], lat, lng, transport=transport)
             travel_from_prev = result["travel_minutes"] if result else None
 
         if next_location:
-            result = await get_travel_time(lat, lng, next_location["lat"], next_location["lng"])
+            result = await get_travel_time(lat, lng, next_location["lat"], next_location["lng"], transport=transport)
             travel_to_next = result["travel_minutes"] if result else None
 
         google_data = await enrich_with_google_rating(name=item.get("title"), lat=lat, lng=lng)

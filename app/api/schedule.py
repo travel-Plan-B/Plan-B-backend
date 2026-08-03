@@ -29,11 +29,10 @@ class ValidateRequest(BaseModel):
 @router.post("/validate")
 async def validate_schedule(request: ValidateRequest):
     travel_result = await get_travel_time(
-        request.location.lat,
-        request.location.lng,
-        request.next_fixed_item.location.lat,
-        request.next_fixed_item.location.lng,
-    )
+    request.location.lat, request.location.lng,
+    request.next_fixed_item.location.lat, request.next_fixed_item.location.lng,
+    transport=request.transport,
+)
     travel_minutes = travel_result["travel_minutes"] if travel_result else 0
 
     result = validate_time_conflict(
