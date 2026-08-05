@@ -1,6 +1,6 @@
-import httpx
-
 import math
+
+import httpx
 
 from app.core.config import settings
 

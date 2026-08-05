@@ -16,6 +16,7 @@ from app.services.category_map import (
 from app.services.google_places_service import enrich_with_google_rating
 from app.services.kakao_mobility_service import get_travel_time
 from app.services.tourapi_service import fetch_tourapi_places_by_category
+from app.services.weather_service import get_current_weather, latlng_to_grid
 
 STALE_DAYS = 30
 
@@ -108,15 +109,22 @@ def filter_by_duration(places: list[dict], available_minutes: int) -> list[dict]
 
 
 async def get_detail_recommendations(
-    db,
-    place_id: str,
-    source: str,
-    prev_location: dict | None,
-    next_location: dict | None,
-    priority: str = "MINIMIZE_TRAVEL",
-    max_candidates: int = 10,
-) -> dict:
-    """디테일탭 - 카테고리 필터링 + 양방향 이동시간 + 기본 체류시간 + AI 최종 선택까지."""
+    db, place_id, source, prev_location, next_location,
+    priority="MINIMIZE_TRAVEL", max_candidates=10, transport="CAR",
+    problem_reason="PLACE_UNAVAILABLE", situational_answer=None,
+):
+    original = db.query(Place).filter_by(source=source, source_id=place_id).first()
+
+    # 심플탭과 동일한 로직: WEATHER면 사용자 응답 존중, 아니면 실제 날씨로 자동 판단
+    weather_info = None
+    if problem_reason != "WEATHER" and original:
+        nx, ny = latlng_to_grid(original.lat, original.lng)
+        weather_info = await get_current_weather(nx, ny)
+
+    is_bad_weather = False
+    if weather_info:
+        is_bad_weather = weather_info["sky_condition"] in ("RAIN", "RAIN_SNOW", "SNOW", "SHOWER")
+
     raw_places, _ = await get_similar_places(db, place_id, source)
     raw_places = raw_places[:max_candidates]
 
@@ -138,55 +146,50 @@ async def get_detail_recommendations(
         user_rating_count = google_data["user_rating_count"] if google_data else None
 
         cat3 = item.get("cat3")
-        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(
-            item.get("contenttypeid")
-        )
+        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(item.get("contenttypeid"))
 
         return {
             "place_id": item.get("contentid"),
             "name": item.get("title"),
             "address": item.get("addr1"),
             "category_tag": category_tag,
+            "is_indoor": None,  # TourAPI 원본엔 실내 정보 없음, 필요시 category_map의 infer_indoor 활용 가능
             "rating": rating,
             "user_rating_count": user_rating_count,
             "lat": lat,
             "lng": lng,
             "travel_time_from_prev_minutes": travel_from_prev,
             "travel_time_to_next_minutes": travel_to_next,
-            "estimated_duration_minutes": (
-                get_default_duration(category_tag) if category_tag else 30
-            ),
+            "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
         }
 
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
 
+    # WEATHER 사유면 사용자 응답 그대로, 아니면 실제 날씨로 자동 판단해서 실내 우선 재배치
+    if problem_reason == "WEATHER" and situational_answer in ("OUTDOOR_ONLY", "BOTH"):
+        enriched = [p for p in enriched if p.get("is_indoor") is True]
+    elif is_bad_weather:
+        enriched.sort(key=lambda p: p.get("is_indoor") is not True)
+
     if priority == "MINIMIZE_TRAVEL":
-
         def total_travel(p):
-            return (p["travel_time_from_prev_minutes"] or 0) + (
-                p["travel_time_to_next_minutes"] or 0
-            )
-
+            return (p["travel_time_from_prev_minutes"] or 0) + (p["travel_time_to_next_minutes"] or 0)
         enriched.sort(key=total_travel)
     elif priority == "SIMILAR_TO_ORIGINAL":
-        # (여기서는 세부적으로 원본과 완전히 동일한 category_tag를 우선하는 정도의 의미)
-        original_place = db.query(Place).filter_by(source=source, source_id=place_id).first()
-        original_category = original_place.category_tag if original_place else None
+        original_category = original.category_tag if original else None
         enriched.sort(key=lambda p: p["category_tag"] != original_category)
-    # EXPLORE_NEW는 현재 get_similar_places()가 동일 카테고리로만 검색하는 구조라
-    # 실질적인 차별화가 어려워 별도 정렬 없이 원래 순서(거리순) 유지 - 추후 검색 범위 확장 시 재검토
 
-    # AI 최종 선택
     priority_text = {
         "MINIMIZE_TRAVEL": "이동 시간이 가장 짧은 곳을 우선으로 선택해주세요.",
         "SIMILAR_TO_ORIGINAL": "원래 장소와 성격이 비슷한 곳을 우선으로 선택해주세요.",
         "EXPLORE_NEW": "평소와는 다른 새로운 느낌의 장소를 우선으로 선택해주세요.",
     }.get(priority, "이동 시간이 가장 짧은 곳을 우선으로 선택해주세요.")
 
-    situation = {
-        "situation_description": f"일정 속 장소를 대체할 곳을 찾고 있습니다. {priority_text}",
-        "available_minutes": None,
-    }
+    situation_description = f"일정 속 장소를 대체할 곳을 찾고 있습니다. {priority_text}"
+    if weather_info and is_bad_weather:
+        situation_description += f" 지금 이 시간대에는 날씨 예보가 좋지 않아({weather_info['sky_condition']}), 실내 장소를 우선 고려해주세요."
+
+    situation = {"situation_description": situation_description, "available_minutes": None}
     ai_result = await get_ai_final_pick(enriched, situation)
 
     if ai_result:

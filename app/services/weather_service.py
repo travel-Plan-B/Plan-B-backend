@@ -1,11 +1,10 @@
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
+from typing import Any
 
 from app.core.config import settings
-
-from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
 
@@ -82,7 +81,7 @@ async def get_current_weather(nx: int, ny: int) -> dict | None:
     """현재 위치의 가장 가까운 미래 예보 시각 기준 날씨 정보 조회."""
     base_date, base_time = _get_latest_base_datetime()
 
-    params = {
+    params: dict[str, Any] = {
         "serviceKey": settings.KMA_SERVICE_KEY,
         "numOfRows": 100,
         "pageNo": 1,
@@ -123,9 +122,9 @@ async def get_current_weather(nx: int, ny: int) -> dict | None:
 
     return {
         "temperature": float(values["TMP"]) if "TMP" in values else None,               # 기온
-        "humidity": int(values["REH"]) if "REH" in values else None,                    # 습도 
+        "humidity": int(values["REH"]) if "REH" in values else None,                    # 습도
         "wind_speed": float(values["WSD"]) if "WSD" in values else None,                # 풍속
         "precipitation_probability": int(values["POP"]) if "POP" in values else None,   # 강수확률
         "sky_condition": _get_sky_condition(values.get("SKY"), values.get("PTY")),      # 하늘상태
-        "forecast_time": target_fcst_time,                                              # 이 예보가 몇 시 기준인지 
+        "forecast_time": target_fcst_time,                                              # 이 예보가 몇 시 기준인지
     }

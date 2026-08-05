@@ -5,10 +5,6 @@ from app.core.database import get_db
 from app.ingest_places import upsert_place
 from app.services.kakao_service import search_kakao_place
 from app.services.normalize_service import normalize_kakao_place
-from app.services.place_repository import get_or_ingest_places
-from app.services.tourapi_service import (
-    fetch_tourapi_places_by_category,
-)
 
 router = APIRouter(prefix="/places", tags=["places"])
 

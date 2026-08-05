@@ -1,8 +1,7 @@
 import json
+import re
 
 import httpx
-
-import re
 
 from app.core.config import settings
 

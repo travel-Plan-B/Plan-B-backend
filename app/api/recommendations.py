@@ -21,6 +21,8 @@ class DetailRecommendRequest(BaseModel):
     next_item_location: Location | None = None
     priority: str = "MINIMIZE_TRAVEL"
     transport: str = "CAR"
+    problem_reason: str
+    situational_answer: str | None = None
 
 
 @router.post("/detail")
@@ -35,6 +37,9 @@ async def recommend_detail(request: DetailRecommendRequest, db: Session = Depend
         prev_location=prev,
         next_location=next_loc,
         priority=request.priority,
+        transport=request.transport,
+        problem_reason=request.problem_reason,
+        situational_answer=request.situational_answer,
     )
 
     return {
