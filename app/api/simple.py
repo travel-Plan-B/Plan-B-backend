@@ -14,6 +14,7 @@ from app.services.simple_service import (
     sort_places,
 )
 from app.services.time_service import calculate_available_minutes
+from app.services.weather_service import get_current_weather, latlng_to_grid
 
 router = APIRouter(prefix="/simple", tags=["simple"])
 
@@ -66,8 +67,18 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
         db, lat=request.current_location.lat, lng=request.current_location.lng
     )
 
+    # 날씨를 명시적으로 선택 안 한 경우, 실제 날씨를 참고해서 자동 판단
+    weather_info = None
+    if request.problem_reason != "WEATHER":
+        nx, ny = latlng_to_grid(request.current_location.lat, request.current_location.lng)
+        weather_info = await get_current_weather(nx, ny)
+
+    is_bad_weather = False
+    if weather_info:
+        is_bad_weather = weather_info["sky_condition"] in ("RAIN", "RAIN_SNOW", "SNOW", "SHOWER")
+
     places = filter_by_category_whitelist(
-        places, request.problem_reason, request.situational_answer
+        places, request.problem_reason, request.situational_answer, force_indoor=is_bad_weather
     )
 
     places = filter_by_duration_simple(places, available_minutes)
@@ -102,6 +113,8 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
             situation_text += " 야외 활동과 오래 걷는 활동을 모두 피하고 싶어하며, 이미 실내 확인된 장소들만 후보로 걸러졌습니다."
     elif request.problem_reason == "TIME_CHANGED":
         situation_text += f" 남은 이용가능시간은 {available_minutes}분입니다."
+    if weather_info and is_bad_weather:
+        situation_text += f" 마침 이 시간대에는 날씨 예보가 좋지 않아({weather_info['sky_condition']}), 실내 장소 위주로 안내해드립니다."
 
     situation = {
         "situation_description": situation_text,
