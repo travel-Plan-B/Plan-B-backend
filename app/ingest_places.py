@@ -37,6 +37,7 @@ async def ingest(db, lat: float, lng: float):
         if google_data:
             normalized["rating"] = google_data["rating"]
             normalized["user_rating_count"] = google_data["user_rating_count"]
+            normalized["parking_status"] = google_data["parking_status"]
 
         upsert_place(db, normalized)
         saved += 1

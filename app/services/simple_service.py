@@ -64,6 +64,7 @@ def place_to_dict(p, recommend_reason: str | None = None) -> dict:
         "travel_time_minutes": getattr(p, "travel_minutes", None),
         "operating_hours": p.operating_hours,
         "parking_available": p.parking_available,
+        "parking_status": p.parking_status,
         "estimated_duration_minutes": get_default_duration(p.category_tag),
         "recommend_reason": recommend_reason,
     }

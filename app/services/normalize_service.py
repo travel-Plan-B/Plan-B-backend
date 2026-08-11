@@ -25,6 +25,7 @@ def normalize_tourapi_place(item: dict) -> dict | None:
         "user_rating_count": None,
         "operating_hours": None,
         "parking_available": None,
+        "parking_status": None,
         "raw_category_source": cat3 or item.get("contenttypeid"),
     }
 

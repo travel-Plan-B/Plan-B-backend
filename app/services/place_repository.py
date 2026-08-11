@@ -144,6 +144,7 @@ async def get_detail_recommendations(
         google_data = await enrich_with_google_rating(name=item.get("title"), lat=lat, lng=lng)
         rating = google_data["rating"] if google_data else None
         user_rating_count = google_data["user_rating_count"] if google_data else None
+        parking_status = google_data["parking_status"] if google_data else None
 
         cat3 = item.get("cat3")
         category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(item.get("contenttypeid"))
@@ -156,13 +157,13 @@ async def get_detail_recommendations(
             "is_indoor": None,  # TourAPI 원본엔 실내 정보 없음, 필요시 category_map의 infer_indoor 활용 가능
             "rating": rating,
             "user_rating_count": user_rating_count,
+            "parking_status": parking_status,
             "lat": lat,
             "lng": lng,
             "travel_time_from_prev_minutes": travel_from_prev,
             "travel_time_to_next_minutes": travel_to_next,
             "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
         }
-
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
 
     # WEATHER 사유면 사용자 응답 그대로, 아니면 실제 날씨로 자동 판단해서 실내 우선 재배치

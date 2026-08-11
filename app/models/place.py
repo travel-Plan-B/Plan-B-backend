@@ -41,6 +41,7 @@ class Place(Base):
 
     operating_hours = Column(Text, nullable=True)
     parking_available = Column(Boolean, nullable=True)
+    parking_status = Column(String(20), nullable=True)
 
     raw_category_source = Column(String(100), nullable=True)
 
