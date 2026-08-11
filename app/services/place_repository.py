@@ -113,6 +113,7 @@ async def get_detail_recommendations(
     db, place_id, source, prev_location, next_location,
     priority="MINIMIZE_TRAVEL", max_candidates=10, transport="CAR",
     problem_reason="PLACE_UNAVAILABLE", situational_answer=None,
+    current_time=None, next_item_start_time=None,
 ):
     original = db.query(Place).filter_by(source=source, source_id=place_id).first()
 
@@ -150,6 +151,20 @@ async def get_detail_recommendations(
         category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(item.get("contenttypeid"))
         is_indoor = infer_indoor("tourapi", cat3, cat1=item.get("cat1"), name=item.get("title"))
 
+        schedule_buffer_minutes = None
+        if current_time and next_item_start_time and travel_from_prev is not None:
+            from app.services.time_service import calculate_available_minutes
+            duration = get_default_duration(category_tag) if category_tag else 30
+            total_before_next_travel = travel_from_prev + duration
+            # current_time에서 total_before_next_travel만큼 지난 시각과 next_item_start_time의 차이
+            from datetime import datetime, timedelta
+            fmt = "%H:%M"
+            start = datetime.strptime(current_time, fmt) + timedelta(minutes=total_before_next_travel)
+            next_fixed = datetime.strptime(next_item_start_time, fmt)
+            travel_next = travel_to_next or 0
+            remaining = (next_fixed - start).total_seconds() / 60 - travel_next
+            schedule_buffer_minutes = int(remaining)
+
         return {
             "place_id": item.get("contentid"),
             "name": item.get("title"),
@@ -164,6 +179,7 @@ async def get_detail_recommendations(
             "travel_time_from_prev_minutes": travel_from_prev,
             "travel_time_to_next_minutes": travel_to_next,
             "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
+            "schedule_buffer_minutes": schedule_buffer_minutes,
         }
 
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])

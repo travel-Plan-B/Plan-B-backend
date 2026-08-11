@@ -5,12 +5,18 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.place_repository import get_detail_recommendations
 
-router = APIRouter(prefix="/recommendations", tags=["recommendations"])
+router = APIRouter(prefix="/detail", tags=["detail"])
 
 
 class Location(BaseModel):
     lat: float
     lng: float
+
+
+class NextFixedItem(BaseModel):
+    lat: float
+    lng: float
+    start_time: str | None = None
 
 
 class DetailRecommendRequest(BaseModel):
@@ -19,13 +25,15 @@ class DetailRecommendRequest(BaseModel):
     source: str
     prev_item_location: Location | None = None
     next_item_location: Location | None = None
+    next_item_start_time: str | None = None
+    current_time: str | None = None
     priority: str = "MINIMIZE_TRAVEL"
     transport: str = "CAR"
     problem_reason: str
     situational_answer: str | None = None
 
 
-@router.post("/detail")
+@router.post("/recommendations")
 async def recommend_detail(request: DetailRecommendRequest, db: Session = Depends(get_db)):
     prev = request.prev_item_location.dict() if request.prev_item_location else None
     next_loc = request.next_item_location.dict() if request.next_item_location else None
@@ -40,8 +48,9 @@ async def recommend_detail(request: DetailRecommendRequest, db: Session = Depend
         transport=request.transport,
         problem_reason=request.problem_reason,
         situational_answer=request.situational_answer,
+        current_time=request.current_time,
+        next_item_start_time=request.next_item_start_time,
     )
-
     return {
         "item_id": request.item_id,
         "ai_recommended": result["ai_recommended"],
