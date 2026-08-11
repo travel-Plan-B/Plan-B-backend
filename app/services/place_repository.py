@@ -12,6 +12,7 @@ from app.services.category_map import (
     TOURAPI_CAT3_CATEGORY_MAP,
     TOURAPI_CAT3_EXCLUDE,
     TOURAPI_CONTENTTYPE_MAP,
+    infer_indoor,
 )
 from app.services.google_places_service import enrich_with_google_rating
 from app.services.kakao_mobility_service import get_travel_time
@@ -115,7 +116,6 @@ async def get_detail_recommendations(
 ):
     original = db.query(Place).filter_by(source=source, source_id=place_id).first()
 
-    # 심플탭과 동일한 로직: WEATHER면 사용자 응답 존중, 아니면 실제 날씨로 자동 판단
     weather_info = None
     if problem_reason != "WEATHER" and original:
         nx, ny = latlng_to_grid(original.lat, original.lng)
@@ -126,7 +126,7 @@ async def get_detail_recommendations(
         is_bad_weather = weather_info["sky_condition"] in ("RAIN", "RAIN_SNOW", "SNOW", "SHOWER")
 
     raw_places, _ = await get_similar_places(db, place_id, source)
-    raw_places = raw_places[:max_candidates]
+    # 여기서 자르지 않고, 최대한 많이(30개) 가져와서 아래 필터링을 거친 후에 자름
 
     async def enrich(item: dict) -> dict:
         lat, lng = float(item["mapy"]), float(item["mapx"])
@@ -148,13 +148,14 @@ async def get_detail_recommendations(
 
         cat3 = item.get("cat3")
         category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(item.get("contenttypeid"))
+        is_indoor = infer_indoor("tourapi", cat3, cat1=item.get("cat1"), name=item.get("title"))
 
         return {
             "place_id": item.get("contentid"),
             "name": item.get("title"),
             "address": item.get("addr1"),
             "category_tag": category_tag,
-            "is_indoor": None,  # TourAPI 원본엔 실내 정보 없음, 필요시 category_map의 infer_indoor 활용 가능
+            "is_indoor": is_indoor,
             "rating": rating,
             "user_rating_count": user_rating_count,
             "parking_status": parking_status,
@@ -164,11 +165,11 @@ async def get_detail_recommendations(
             "travel_time_to_next_minutes": travel_to_next,
             "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
         }
+
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
 
-    # WEATHER 사유면 사용자 응답 그대로, 아니면 실제 날씨로 자동 판단해서 실내 우선 재배치
     if problem_reason == "WEATHER" and situational_answer in ("OUTDOOR_ONLY", "BOTH"):
-        enriched = [p for p in enriched if p.get("is_indoor") is True]
+        enriched = [p for p in enriched if p.get("is_indoor") is not False]
     elif is_bad_weather:
         enriched.sort(key=lambda p: p.get("is_indoor") is not True)
 
@@ -179,6 +180,8 @@ async def get_detail_recommendations(
     elif priority == "SIMILAR_TO_ORIGINAL":
         original_category = original.category_tag if original else None
         enriched.sort(key=lambda p: p["category_tag"] != original_category)
+
+    enriched = enriched[:max_candidates]
 
     priority_text = {
         "MINIMIZE_TRAVEL": "이동 시간이 가장 짧은 곳을 우선으로 선택해주세요.",
