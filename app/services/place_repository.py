@@ -134,13 +134,20 @@ async def get_detail_recommendations(
         travel_from_prev = None
         travel_to_next = None
 
+        distance_from_prev = None
+        distance_from_prev_km = None
+        distance_to_next = None
+
         if prev_location:
             result = await get_travel_time(prev_location["lat"], prev_location["lng"], lat, lng, transport=transport)
             travel_from_prev = result["travel_minutes"] if result else None
+            distance_from_prev = result["distance"] if result else None
+            distance_from_prev_km = result["distance_km"] if result else None
 
         if next_location:
             result = await get_travel_time(lat, lng, next_location["lat"], next_location["lng"], transport=transport)
             travel_to_next = result["travel_minutes"] if result else None
+            distance_to_next = result["distance"] if result else None
 
         google_data = await enrich_with_google_rating(name=item.get("title"), lat=lat, lng=lng)
         rating = google_data["rating"] if google_data else None
@@ -178,11 +185,20 @@ async def get_detail_recommendations(
             "lng": lng,
             "travel_time_from_prev_minutes": travel_from_prev,
             "travel_time_to_next_minutes": travel_to_next,
+            "distance_from_prev": distance_from_prev,
+            "distance_from_prev_km": distance_from_prev_km,
+            "distance_to_next": distance_to_next,
             "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
             "schedule_buffer_minutes": schedule_buffer_minutes,
         }
 
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
+
+    MAX_DISTANCE_KM = 10
+    enriched = [
+        p for p in enriched
+        if p.get("distance_from_prev_km") is None or p["distance_from_prev_km"] <= MAX_DISTANCE_KM
+    ]
 
     if problem_reason == "WEATHER" and situational_answer in ("OUTDOOR_ONLY", "BOTH"):
         enriched = [p for p in enriched if p.get("is_indoor") is not False]
@@ -210,7 +226,7 @@ async def get_detail_recommendations(
         situation_description += f" 지금 이 시간대에는 날씨 예보가 좋지 않아({weather_info['sky_condition']}), 실내 장소를 우선 고려해주세요."
 
     situation = {"situation_description": situation_description, "available_minutes": None}
-    ai_result = await get_ai_final_pick(enriched, situation)
+    ai_result = await get_ai_final_pick(enriched, situation, transport=transport)
 
     if ai_result:
         reason_map = {r["place_id"]: r["reason"] for r in ai_result}

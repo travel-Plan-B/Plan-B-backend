@@ -8,46 +8,48 @@ from app.core.config import settings
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
 
-async def get_ai_final_pick(candidates: list[dict], situation: dict) -> list[dict] | None:
+async def get_ai_final_pick(candidates: list[dict], situation: dict, transport: str = "CAR") -> list[dict] | None:
+    transport_label = "걸어서" if transport == "WALK" else "차로"
+
     candidate_summary = []
     for c in candidates:
         travel_info = c.get("travel_time_minutes")
         if travel_info is None:
-            # 디테일탭 형태(양방향) 대응
             prev = c.get("travel_time_from_prev_minutes")
             next_ = c.get("travel_time_to_next_minutes")
-            travel_info = (
-                f"이전 장소에서 {prev}분, 다음 장소까지 {next_}분"
-                if (prev is not None or next_ is not None)
-                else None
-            )
+            travel_info = f"{transport_label} 약 {prev}분" if prev is not None else None
+        else:
+            travel_info = f"{transport_label} 약 {travel_info}분"
 
-        candidate_summary.append(
-            {
-                "place_id": c["place_id"],
-                "name": c["name"],
-                "category_tag": c.get("category_tag"),
-                "travel_time": travel_info,
-                "rating": c.get("rating"),
-            }
-        )
+        candidate_summary.append({
+            "place_id": c["place_id"],
+            "name": c["name"],
+            "category_tag": c.get("category_tag"),
+            "travel_time": travel_info,
+            "rating": c.get("rating"),
+        })
 
     prompt = f"""상황: {situation['situation_description']}
 후보 장소 목록(반드시 이 중에서만 선택):
 {json.dumps(candidate_summary, ensure_ascii=False)}
 
-이 중 가장 적합한 3곳을 선택하고, 각각 이유를 한 문장으로 작성해줘.
+이 중 가장 적합한 3곳을 선택하고, 각각 이유를 2~3개의 짧은 문장으로 작성해줘.
 
 이유를 쓸 때 지켜야 할 것:
-- 평점이나 이동시간 숫자를 그대로 나열하지 말 것 (예: "평점 4.5, 이동시간 9분이라 좋아요" 금지)
-- 대신 사용자가 원래 가려던 곳을 못 가서 아쉬운 마음을 공감하면서, 이 장소가 어떤 매력이 있는지 자연스럽게 설명할 것
-- 마치 친구가 대안을 추천해주듯 따뜻하고 친근한 톤으로 작성할 것
-- 좋은 예시: "아쉽게도 원래 계획하신 곳은 어려울 것 같아요. 대신 가까운 거리에 아름다운 전통차 체험도 함께 즐길 수 있는 이곳은 어떠세요?"
-- 나쁜 예시: "평점 4.8이고 이동시간 7분으로 접근성이 좋습니다."
+- 이유는 배열 형태로, 문장 2~3개로 나눠서 작성할 것 (한 문장에 다 몰아넣지 말 것)
+- 공감이나 위로하는 표현("아쉬우시겠지만", "안타깝지만" 등)은 쓰지 말 것
+- 이동시간을 언급할 때는 반드시 후보 목록에 있는 travel_time 값을 그대로 인용할 것, 숫자를 임의로 바꾸지 말 것
+- 애매한 표현("좋은 평점") 대신, 실제 평점 수치를 근거로 들 것 (예: "평점 4.7점")
+- 부자연스럽거나 어색한 단어 선택 주의 (예: "충동적으로" 같은 부정적 뉘앙스 단어는 부적절)
+- 담백하고 명확한 존댓말로, 각 문장은 짧고 간결하게 작성할 것
 
-반드시 아래 JSON 배열 형식으로만 응답(다른 텍스트 없이):
-[{{"place_id": "...", "reason": "..."}}, {{"place_id": "...", "reason": "..."}}, {{"place_id": "...", "reason": "..."}}]"""
-    ...
+반드시 아래 JSON 형식으로만 응답(다른 텍스트 없이):
+[
+  {{"place_id": "...", "reason": ["이유 문장1", "이유 문장2", "이유 문장3"]}},
+  {{"place_id": "...", "reason": ["이유 문장1", "이유 문장2"]}},
+  {{"place_id": "...", "reason": ["이유 문장1", "이유 문장2", "이유 문장3"]}}
+]"""
+    ...  # 나머지 로직(API 호출, 파싱)은 기존과 동일
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:

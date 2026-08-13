@@ -26,12 +26,12 @@ def sort_by_popularity(places):
     return sorted(places, key=lambda p: p.user_rating_count or 0, reverse=True)
 
 
-async def enrich_with_travel_time(places, current_lat: float, current_lng: float, transport: str = "CAR"):
-    """각 장소에 현재 위치로부터의 이동시간(분)을 계산해서 붙임. 실패 시 None."""
-
+async def enrich_with_travel_time(places, current_lat, current_lng, transport="CAR"):
     async def attach(p):
         result = await get_travel_time(current_lat, current_lng, p.lat, p.lng, transport=transport)
         p.travel_minutes = result["travel_minutes"] if result else None
+        p.distance = result["distance"] if result else None
+        p.distance_km = result["distance_km"] if result else None
         return p
 
     return await asyncio.gather(*[attach(p) for p in places])
@@ -62,6 +62,7 @@ def place_to_dict(p, recommend_reason: str | None = None) -> dict:
         "description": p.description,
         "address": p.address,
         "travel_time_minutes": getattr(p, "travel_minutes", None),
+        "distance": getattr(p, "distance", None),
         "operating_hours": p.operating_hours,
         "parking_available": p.parking_available,
         "parking_status": p.parking_status,

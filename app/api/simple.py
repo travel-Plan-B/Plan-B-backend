@@ -99,6 +99,12 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
         places, request.current_location.lat, request.current_location.lng, transport=request.transport
     )
 
+    MAX_DISTANCE_KM = 10
+    places = [
+        p for p in places
+        if getattr(p, "distance_km", None) is None or p.distance_km <= MAX_DISTANCE_KM
+    ]
+
     places = sort_places(places, request.sort)
     top10 = places[:10]
     top10_dicts = [place_to_dict(p) for p in top10]
@@ -121,7 +127,7 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
         "available_minutes": available_minutes,
     }
 
-    ai_result = await get_ai_final_pick(top10_dicts, situation)
+    ai_result = await get_ai_final_pick(top10_dicts, situation, transport=request.transport)
 
     if ai_result:
         reason_map = {r["place_id"]: r["reason"] for r in ai_result}
