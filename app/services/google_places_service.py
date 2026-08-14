@@ -5,7 +5,9 @@ from app.core.config import settings
 TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 
 
-async def enrich_with_google_rating(name: str, lat: float, lng: float, max_distance_km: float = 1.0) -> dict | None:
+async def enrich_with_google_rating(
+    name: str, lat: float, lng: float, max_distance_km: float = 1.0
+) -> dict | None:
     """장소명+좌표 기반으로 Google Places에서 평점/리뷰수/주차정보를 찾아 보완.
     매칭 실패 시 None 반환."""
     headers = {
@@ -16,10 +18,7 @@ async def enrich_with_google_rating(name: str, lat: float, lng: float, max_dista
     body = {
         "textQuery": name,
         "locationBias": {
-            "circle": {
-                "center": {"latitude": lat, "longitude": lng},
-                "radius": 500.0
-            }
+            "circle": {"center": {"latitude": lat, "longitude": lng}, "radius": 500.0}
         },
         "languageCode": "ko",
         "maxResultCount": 1,
@@ -47,16 +46,20 @@ async def enrich_with_google_rating(name: str, lat: float, lng: float, max_dista
         return None
 
     parking = top.get("parkingOptions", {})
-    has_free_parking = any([
-        parking.get("freeParkingLot"),
-        parking.get("freeStreetParking"),
-        parking.get("freeGarageParking"),
-    ])
-    has_paid_parking = any([
-        parking.get("paidParkingLot"),
-        parking.get("paidStreetParking"),
-        parking.get("paidGarageParking"),
-    ])
+    has_free_parking = any(
+        [
+            parking.get("freeParkingLot"),
+            parking.get("freeStreetParking"),
+            parking.get("freeGarageParking"),
+        ]
+    )
+    has_paid_parking = any(
+        [
+            parking.get("paidParkingLot"),
+            parking.get("paidStreetParking"),
+            parking.get("paidGarageParking"),
+        ]
+    )
 
     if has_free_parking:
         parking_status = "FREE"

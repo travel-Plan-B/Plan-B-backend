@@ -52,8 +52,10 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
     travel_to_next = 0
     if request.next_place:
         result = await get_travel_time(
-            request.current_location.lat, request.current_location.lng,
-            request.next_place.lat, request.next_place.lng,
+            request.current_location.lat,
+            request.current_location.lng,
+            request.next_place.lat,
+            request.next_place.lng,
             transport=request.transport,
         )
         travel_to_next = result["travel_minutes"] if result else 0
@@ -96,12 +98,16 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
         }
 
     places = await enrich_with_travel_time(
-        places, request.current_location.lat, request.current_location.lng, transport=request.transport
+        places,
+        request.current_location.lat,
+        request.current_location.lng,
+        transport=request.transport,
     )
 
     MAX_DISTANCE_KM = 10
     places = [
-        p for p in places
+        p
+        for p in places
         if getattr(p, "distance_km", None) is None or p.distance_km <= MAX_DISTANCE_KM
     ]
 

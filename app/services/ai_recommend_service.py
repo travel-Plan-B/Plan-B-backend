@@ -8,7 +8,9 @@ from app.core.config import settings
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
 
-async def get_ai_final_pick(candidates: list[dict], situation: dict, transport: str = "CAR") -> list[dict] | None:
+async def get_ai_final_pick(
+    candidates: list[dict], situation: dict, transport: str = "CAR"
+) -> list[dict] | None:
     transport_label = "걸어서" if transport == "WALK" else "차로"
 
     candidate_summary = []
@@ -17,17 +19,24 @@ async def get_ai_final_pick(candidates: list[dict], situation: dict, transport: 
         if travel_info is None:
             prev = c.get("travel_time_from_prev_minutes")
             next_ = c.get("travel_time_to_next_minutes")
-            travel_info = f"{transport_label} 약 {prev}분" if prev is not None else None
-        else:
-            travel_info = f"{transport_label} 약 {travel_info}분"
+            if prev is not None and next_ is not None:
+                travel_info = (
+                    f"{transport_label} 이전 장소에서 약 {prev}분, 다음 장소까지 약 {next_}분"
+                )
+            elif prev is not None:
+                travel_info = f"{transport_label} 약 {prev}분"
+            else:
+                travel_info = None
 
-        candidate_summary.append({
-            "place_id": c["place_id"],
-            "name": c["name"],
-            "category_tag": c.get("category_tag"),
-            "travel_time": travel_info,
-            "rating": c.get("rating"),
-        })
+        candidate_summary.append(
+            {
+                "place_id": c["place_id"],
+                "name": c["name"],
+                "category_tag": c.get("category_tag"),
+                "travel_time": travel_info,
+                "rating": c.get("rating"),
+            }
+        )
 
     prompt = f"""상황: {situation['situation_description']}
 후보 장소 목록(반드시 이 중에서만 선택):

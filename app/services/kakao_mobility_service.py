@@ -24,7 +24,10 @@ def estimate_walking_distance_and_time(
     R = 6371  # 지구 반지름(km)
     dlat = math.radians(lat2 - lat1)
     dlng = math.radians(lng2 - lng1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    )
     distance_km = round(R * 2 * math.asin(math.sqrt(a)) * 1.3, 1)
     minutes = round((distance_km / walking_speed_kmh) * 60)
     return distance_km, minutes
@@ -36,7 +39,9 @@ async def get_travel_time(
     """두 좌표 간 이동시간(분)과 거리 계산.
     자동차: 카카오모빌리티 실제 경로 API. 도보: 직선거리 기준 추정치(estimated=True)."""
     if transport == "WALK":
-        distance_km, minutes = estimate_walking_distance_and_time(origin_lat, origin_lng, dest_lat, dest_lng)
+        distance_km, minutes = estimate_walking_distance_and_time(
+            origin_lat, origin_lng, dest_lat, dest_lng
+        )
         return {
             "travel_minutes": minutes,
             "distance_km": distance_km,

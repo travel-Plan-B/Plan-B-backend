@@ -1,8 +1,8 @@
 import math
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import httpx
-from typing import Any
 
 from app.core.config import settings
 
@@ -106,7 +106,9 @@ async def get_current_weather(nx: int, ny: int) -> dict | None:
     # 지금 시각 이후의 fcstTime 중 가장 이른 것을 찾음
     now_time = datetime.now(KST).strftime("%H%M")
     fcst_times = sorted({item.get("fcstTime") for item in item_list if item.get("fcstTime")})
-    target_fcst_time = next((t for t in fcst_times if t >= now_time), fcst_times[0] if fcst_times else None)
+    target_fcst_time = next(
+        (t for t in fcst_times if t >= now_time), fcst_times[0] if fcst_times else None
+    )
 
     if target_fcst_time is None:
         return None
@@ -114,17 +116,20 @@ async def get_current_weather(nx: int, ny: int) -> dict | None:
     values = {}
     for item in item_list:
         category = item.get("category")
-        if category in ("TMP", "REH", "WSD", "POP", "SKY", "PTY") and item.get("fcstTime") == target_fcst_time:
+        if (
+            category in ("TMP", "REH", "WSD", "POP", "SKY", "PTY")
+            and item.get("fcstTime") == target_fcst_time
+        ):
             values[category] = item.get("fcstValue")
 
     if not values:
         return None
 
     return {
-        "temperature": float(values["TMP"]) if "TMP" in values else None,               # 기온
-        "humidity": int(values["REH"]) if "REH" in values else None,                    # 습도
-        "wind_speed": float(values["WSD"]) if "WSD" in values else None,                # 풍속
-        "precipitation_probability": int(values["POP"]) if "POP" in values else None,   # 강수확률
-        "sky_condition": _get_sky_condition(values.get("SKY"), values.get("PTY")),      # 하늘상태
-        "forecast_time": target_fcst_time,                                              # 이 예보가 몇 시 기준인지
+        "temperature": float(values["TMP"]) if "TMP" in values else None,  # 기온
+        "humidity": int(values["REH"]) if "REH" in values else None,  # 습도
+        "wind_speed": float(values["WSD"]) if "WSD" in values else None,  # 풍속
+        "precipitation_probability": int(values["POP"]) if "POP" in values else None,  # 강수확률
+        "sky_condition": _get_sky_condition(values.get("SKY"), values.get("PTY")),  # 하늘상태
+        "forecast_time": target_fcst_time,  # 이 예보가 몇 시 기준인지
     }

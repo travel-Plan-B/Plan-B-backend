@@ -110,10 +110,18 @@ def filter_by_duration(places: list[dict], available_minutes: int) -> list[dict]
 
 
 async def get_detail_recommendations(
-    db, place_id, source, prev_location, next_location,
-    priority="MINIMIZE_TRAVEL", max_candidates=10, transport="CAR",
-    problem_reason="PLACE_UNAVAILABLE", situational_answer=None,
-    current_time=None, next_item_start_time=None,
+    db,
+    place_id,
+    source,
+    prev_location,
+    next_location,
+    priority="MINIMIZE_TRAVEL",
+    max_candidates=10,
+    transport="CAR",
+    problem_reason="PLACE_UNAVAILABLE",
+    situational_answer=None,
+    current_time=None,
+    next_item_start_time=None,
 ):
     original = db.query(Place).filter_by(source=source, source_id=place_id).first()
 
@@ -139,13 +147,17 @@ async def get_detail_recommendations(
         distance_to_next = None
 
         if prev_location:
-            result = await get_travel_time(prev_location["lat"], prev_location["lng"], lat, lng, transport=transport)
+            result = await get_travel_time(
+                prev_location["lat"], prev_location["lng"], lat, lng, transport=transport
+            )
             travel_from_prev = result["travel_minutes"] if result else None
             distance_from_prev = result["distance"] if result else None
             distance_from_prev_km = result["distance_km"] if result else None
 
         if next_location:
-            result = await get_travel_time(lat, lng, next_location["lat"], next_location["lng"], transport=transport)
+            result = await get_travel_time(
+                lat, lng, next_location["lat"], next_location["lng"], transport=transport
+            )
             travel_to_next = result["travel_minutes"] if result else None
             distance_to_next = result["distance"] if result else None
 
@@ -155,18 +167,23 @@ async def get_detail_recommendations(
         parking_status = google_data["parking_status"] if google_data else None
 
         cat3 = item.get("cat3")
-        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(item.get("contenttypeid"))
+        category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(
+            item.get("contenttypeid")
+        )
         is_indoor = infer_indoor("tourapi", cat3, cat1=item.get("cat1"), name=item.get("title"))
 
         schedule_buffer_minutes = None
         if current_time and next_item_start_time and travel_from_prev is not None:
-            from app.services.time_service import calculate_available_minutes
+
             duration = get_default_duration(category_tag) if category_tag else 30
             total_before_next_travel = travel_from_prev + duration
             # current_time에서 total_before_next_travel만큼 지난 시각과 next_item_start_time의 차이
             from datetime import datetime, timedelta
+
             fmt = "%H:%M"
-            start = datetime.strptime(current_time, fmt) + timedelta(minutes=total_before_next_travel)
+            start = datetime.strptime(current_time, fmt) + timedelta(
+                minutes=total_before_next_travel
+            )
             next_fixed = datetime.strptime(next_item_start_time, fmt)
             travel_next = travel_to_next or 0
             remaining = (next_fixed - start).total_seconds() / 60 - travel_next
@@ -188,7 +205,9 @@ async def get_detail_recommendations(
             "distance_from_prev": distance_from_prev,
             "distance_from_prev_km": distance_from_prev_km,
             "distance_to_next": distance_to_next,
-            "estimated_duration_minutes": get_default_duration(category_tag) if category_tag else 30,
+            "estimated_duration_minutes": (
+                get_default_duration(category_tag) if category_tag else 30
+            ),
             "schedule_buffer_minutes": schedule_buffer_minutes,
         }
 
@@ -196,7 +215,8 @@ async def get_detail_recommendations(
 
     MAX_DISTANCE_KM = 10
     enriched = [
-        p for p in enriched
+        p
+        for p in enriched
         if p.get("distance_from_prev_km") is None or p["distance_from_prev_km"] <= MAX_DISTANCE_KM
     ]
 
@@ -206,8 +226,12 @@ async def get_detail_recommendations(
         enriched.sort(key=lambda p: p.get("is_indoor") is not True)
 
     if priority == "MINIMIZE_TRAVEL":
+
         def total_travel(p):
-            return (p["travel_time_from_prev_minutes"] or 0) + (p["travel_time_to_next_minutes"] or 0)
+            return (p["travel_time_from_prev_minutes"] or 0) + (
+                p["travel_time_to_next_minutes"] or 0
+            )
+
         enriched.sort(key=total_travel)
     elif priority == "SIMILAR_TO_ORIGINAL":
         original_category = original.category_tag if original else None

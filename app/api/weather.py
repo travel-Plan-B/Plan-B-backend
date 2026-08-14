@@ -14,6 +14,9 @@ async def get_weather(
     weather = await get_current_weather(nx, ny)
 
     if weather is None:
-        return {"success": False, "error": {"code": "WEATHER_UNAVAILABLE", "message": "날씨 정보를 가져올 수 없습니다."}}
+        return {
+            "success": False,
+            "error": {"code": "WEATHER_UNAVAILABLE", "message": "날씨 정보를 가져올 수 없습니다."},
+        }
 
     return {"success": True, "data": weather}
