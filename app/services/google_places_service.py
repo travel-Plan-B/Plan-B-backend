@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import httpx
 
 from app.core.config import settings
@@ -5,15 +7,36 @@ from app.core.config import settings
 TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 
 
+def _format_operating_hours(opening_hours: dict | None) -> tuple[str | None, bool | None]:
+    """오늘 요일 기준 운영시간을 'HH:MM-HH:MM' 형식으로 요약. (운영시간 문자열, 지금 영업중 여부) 반환."""
+    if not opening_hours:
+        return None, None
+
+    open_now = opening_hours.get("openNow")
+    periods = opening_hours.get("periods", [])
+
+    today_weekday = (datetime.now().weekday() + 1) % 7  # 파이썬(월=0) -> 구글(일=0) 변환
+
+    for period in periods:
+        open_info = period.get("open", {})
+        close_info = period.get("close", {})
+        if open_info.get("day") == today_weekday:
+            open_str = f"{open_info.get('hour', 0):02d}:{open_info.get('minute', 0):02d}"
+            close_str = f"{close_info.get('hour', 0):02d}:{close_info.get('minute', 0):02d}"
+            return f"{open_str}-{close_str}", open_now
+
+    return None, open_now  # 오늘 운영시간 정보 자체가 없으면(=휴무일 가능성)
+
+
 async def enrich_with_google_rating(
     name: str, lat: float, lng: float, max_distance_km: float = 1.0
 ) -> dict | None:
-    """장소명+좌표 기반으로 Google Places에서 평점/리뷰수/주차정보를 찾아 보완.
+    """장소명+좌표 기반으로 Google Places에서 평점/리뷰수/주차정보/운영시간을 찾아 보완.
     매칭 실패 시 None 반환."""
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": settings.GOOGLE_PLACES_API_KEY,
-        "X-Goog-FieldMask": "places.displayName,places.rating,places.userRatingCount,places.location,places.parkingOptions",
+        "X-Goog-FieldMask": "places.displayName,places.rating,places.userRatingCount,places.location,places.parkingOptions,places.regularOpeningHours",
     }
     body = {
         "textQuery": name,
@@ -68,8 +91,12 @@ async def enrich_with_google_rating(
     else:
         parking_status = None
 
+    operating_hours, open_now = _format_operating_hours(top.get("regularOpeningHours"))
+
     return {
         "rating": top.get("rating"),
         "user_rating_count": top.get("userRatingCount"),
         "parking_status": parking_status,
+        "operating_hours": operating_hours,
+        "open_now": open_now,
     }

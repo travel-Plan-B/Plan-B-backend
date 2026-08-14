@@ -165,6 +165,7 @@ async def get_detail_recommendations(
         rating = google_data["rating"] if google_data else None
         user_rating_count = google_data["user_rating_count"] if google_data else None
         parking_status = google_data["parking_status"] if google_data else None
+        operating_hours = google_data["operating_hours"] if google_data else None
 
         cat3 = item.get("cat3")
         category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(
@@ -198,6 +199,7 @@ async def get_detail_recommendations(
             "rating": rating,
             "user_rating_count": user_rating_count,
             "parking_status": parking_status,
+            "operating_hours": operating_hours,
             "lat": lat,
             "lng": lng,
             "travel_time_from_prev_minutes": travel_from_prev,
