@@ -61,6 +61,11 @@ async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10
     )
 
 
+def _normalize_name(name: str | None) -> str:
+    """이름 비교용 정규화: 공백 제거."""
+    return (name or "").replace(" ", "")
+
+
 async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict], int]:
     original = db.query(Place).filter_by(source=source, source_id=place_id).first()
     if original is None:
@@ -88,7 +93,10 @@ async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict]
     places = [p for p in places if p.get("cat3") not in TOURAPI_CAT3_EXCLUDE]
 
     # 원본 장소 자기 자신은 후보에서 제외
-    places = [p for p in places if p.get("contentid") != place_id]
+    places = [
+        p for p in places if _normalize_name(p.get("title")) != _normalize_name(original.name)
+    ]
+    ...
 
     return places, used_radius
 
