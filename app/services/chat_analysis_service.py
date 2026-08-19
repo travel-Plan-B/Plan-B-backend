@@ -14,6 +14,13 @@ REQUIRED_FIELDS_PROMPT = """당신은 여행 중 대체 장소를 추천해주�
 매우 중요한 규칙: 대화 중 이전에 이미 파악된 정보는 절대 잊지 말고 계속 유지하세요.
 같은 질문을 두 번 반복하지 마세요.
 
+사용자가 위치를 "서울", "천안", "강릉"처럼 시/도 단위로만 답하면, 이것만으로는
+정확한 추천이 어려우니 더 구체적인 위치(구/동, 건물명, 근처 랜드마크 등)를 반드시
+되물으세요. 예: "천안 어느 동네에 계신가요?" 또는 "가까운 건물이나 지하철역이 있나요?"
+
+"OO동", "OO역", "OO대학교" 처럼 더 구체적인 표현이 있을 때만 current_location으로
+확정하세요.
+
 ## place_name 추출 규칙 (가장 중요, 반드시 지킬 것)
 사용자 문장에서 "장소/시설/가게 이름으로 보이는 고유명사 표현"이 하나라도 있다면,
 그 표현을 최대한 그대로 place_name에 담으세요. 예를 들면:
@@ -33,9 +40,14 @@ category는 place_name으로 넣을 만한 고유명사가 정말 하나도 없�
 4. transport가 없으면 자동차(CAR)로 간주하고 넘어가세요. 이동수단을 따로 캐묻지 마세요.
 5. 사용자의 마지막 메시지가 이동수단 답변이면, transport만 반영하고 다른 필드는 유지하세요.
 
-search_mode 판단:
-- "SAME_CATEGORY": "다른 카페", "비슷한 곳" 처럼 같은 종류를 원할 때 (기본값)
-- "ANYTHING_NEARBY": "주변에 뭐 있어", "아무거나" 처럼 카테고리 상관없이 원할 때
+search_mode 판단 (매우 중요, 신중하게 판단할 것):
+- 기본값은 항상 "SAME_CATEGORY"입니다.
+- "ANYTHING_NEARBY"는 사용자가 "아무거나", "뭐든", "종류 상관없이", "주변에 뭐 할 거 있어"처럼
+  카테고리 자체를 특정하지 않고 명시적으로 무관심을 표현했을 때만 사용하세요.
+- 사용자가 "밥 먹으려고", "카페 가려고"처럼 구체적인 카테고리를 언급했다면, 그 자체가 이미
+  카테고리를 원한다는 뜻이므로 반드시 "SAME_CATEGORY"입니다. "ANYTHING_NEARBY"로 착각하지 마세요.
+- 한번 판단한 search_mode는 대화가 끝날 때까지 유지하세요. 이후 턴에서 다시 판단하지 말고
+  이전 값을 그대로 유지하세요.
 
 category 값은 반드시 다음 중 하나로: 관광지, 문화시설, 카페, 식당, 레포츠
 
@@ -79,7 +91,17 @@ async def analyze_conversation(conversation: list[dict]) -> dict | None:
 
         match = re.search(r"\{.*\}", raw_text, re.DOTALL)
         if not match:
-            return None
+            return {
+                "status": "NEED_MORE_INFO",
+                "question": raw_text.strip(),
+                "extracted": {
+                    "place_name": None,
+                    "category": None,
+                    "current_location": None,
+                    "transport": None,
+                    "search_mode": "SAME_CATEGORY",
+                },
+            }
         return json.loads(match.group())
     except Exception as e:
         print(f"[챗봇 분석 실패] {type(e).__name__}: {e}")
