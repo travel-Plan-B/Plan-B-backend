@@ -43,7 +43,9 @@ async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10
         .all()
     )
 
-    if existing:
+    MIN_CACHE_COUNT = 10
+
+    if existing and len(existing) >= MIN_CACHE_COUNT:
         print(f"[CACHE HIT] DB에서 {len(existing)}개 재사용 (외부 API 호출 없음)")
         return existing
 
@@ -96,7 +98,6 @@ async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict]
     places = [
         p for p in places if _normalize_name(p.get("title")) != _normalize_name(original.name)
     ]
-    ...
 
     return places, used_radius
 
