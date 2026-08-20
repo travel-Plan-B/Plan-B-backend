@@ -17,7 +17,7 @@ from app.services.normalize_service import normalize_kakao_place
 from app.services.place_repository import (
     get_detail_recommendations,
     get_or_ingest_places,
-)  # noqa: F401 (참고용, 직접 호출은 아래 함수 사용)
+)  # noqa: F401
 from app.services.simple_service import enrich_with_travel_time, place_to_dict, sort_places
 from app.services.tourapi_service import fetch_tourapi_places_by_category
 
@@ -203,4 +203,8 @@ async def _ai_pick_and_format(
         ai_recommended = candidates[:3]
         more_places = candidates[3:]
 
-    return {"ai_recommended": ai_recommended, "more_places": more_places}
+        return {
+            "ai_recommended": ai_recommended,
+            "more_places": more_places,
+            "travel_time_disclaimer": "입력하신 위치 기준으로 계산된 예상 이동시간이며, 실제와 다를 수 있습니다.",
+        }

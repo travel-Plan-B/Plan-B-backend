@@ -59,14 +59,18 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
     has_target = merged_extracted.get("place_name") or merged_extracted.get("category")
     has_location = merged_extracted.get("current_location")
     is_anything_nearby = merged_extracted.get("search_mode") == "ANYTHING_NEARBY"
+    has_transport = merged_extracted.get("transport") is not None
 
     if is_anything_nearby:
-        status = "READY" if has_location else "NEED_MORE_INFO"
+        status = "READY" if (has_location and has_transport) else "NEED_MORE_INFO"
     else:
-        status = "READY" if (has_target and has_location) else "NEED_MORE_INFO"
+        status = "READY" if (has_target and has_location and has_transport) else "NEED_MORE_INFO"
 
-    if status == "NEED_MORE_INFO":
-        question = analysis["question"] or "필요한 정보를 조금 더 알려주시겠어요?"
+        if status == "NEED_MORE_INFO":
+            if not has_transport and has_target and has_location:
+                question = "걸어서 가시나요, 차로 가시나요?"
+            else:
+                question = analysis["question"] or "필요한 정보를 조금 더 알려주시겠어요?"
         assistant_message = {"role": "assistant", "content": question}
         await append_message(session_id, assistant_message)
         return {"session_id": session_id, "type": "QUESTION", "message": question}

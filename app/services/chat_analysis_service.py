@@ -37,7 +37,8 @@ category는 place_name으로 넣을 만한 고유명사가 정말 하나도 없�
 1. current_location이 없으면 → 위치를 물어보세요.
 2. current_location은 있는데 place_name도 category도 없으면 → "어떤 장소를 찾고 계신가요?"라고 딱 한 번만 물어보세요.
 3. place_name 또는 category가 있고, current_location도 있으면 → 추가 질문 없이 바로 READY로 진행하세요.
-4. transport가 없으면 자동차(CAR)로 간주하고 넘어가세요. 이동수단을 따로 캐묻지 마세요.
+4. current_location과 place_name(또는 category)이 모두 있는데 transport가 아직 없으면,
+   반드시 "걸어서 가시나요, 차로 가시나요?"처럼 이동수단을 한 번 물어보세요. 넘어가지 마세요.
 5. 사용자의 마지막 메시지가 이동수단 답변이면, transport만 반영하고 다른 필드는 유지하세요.
 
 search_mode 판단 (매우 중요, 신중하게 판단할 것):
