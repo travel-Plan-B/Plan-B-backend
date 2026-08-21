@@ -28,6 +28,13 @@ def _format_operating_hours(opening_hours: dict | None) -> tuple[str | None, boo
     return None, open_now  # 오늘 운영시간 정보 자체가 없으면(=휴무일 가능성)
 
 
+def build_photo_url(photo_name: str | None, max_width: int = 400) -> str | None:
+    """Google Places photo reference를 실제 이미지 URL로 변환."""
+    if not photo_name:
+        return None
+    return f"https://places.googleapis.com/v1/{photo_name}/media?maxWidthPx={max_width}&key={settings.GOOGLE_PLACES_API_KEY}"
+
+
 async def enrich_with_google_rating(
     name: str, lat: float, lng: float, max_distance_km: float = 1.0
 ) -> dict | None:
@@ -36,7 +43,13 @@ async def enrich_with_google_rating(
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": settings.GOOGLE_PLACES_API_KEY,
-        "X-Goog-FieldMask": "places.displayName,places.rating,places.userRatingCount,places.location,places.parkingOptions,places.regularOpeningHours",
+        "X-Goog-FieldMask": "places.displayName,"
+        "places.rating,"
+        "places.userRatingCount,"
+        "places.location,"
+        "places.parkingOptions,"
+        "places.regularOpeningHours,"
+        "places.photos",
     }
     body = {
         "textQuery": name,
@@ -93,10 +106,15 @@ async def enrich_with_google_rating(
 
     operating_hours, open_now = _format_operating_hours(top.get("regularOpeningHours"))
 
+    photos = top.get("photos", [])
+    photo_name = photos[0].get("name") if photos else None
+    image_url = build_photo_url(photo_name)
+
     return {
         "rating": top.get("rating"),
         "user_rating_count": top.get("userRatingCount"),
         "parking_status": parking_status,
         "operating_hours": operating_hours,
         "open_now": open_now,
+        "image_url": image_url,
     }

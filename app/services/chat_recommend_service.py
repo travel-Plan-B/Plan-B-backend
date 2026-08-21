@@ -204,8 +204,8 @@ async def _ai_pick_and_format(
         ai_recommended = candidates[:3]
         more_places = candidates[3:]
 
-        return {
-            "ai_recommended": ai_recommended,
-            "more_places": more_places,
-            "travel_time_disclaimer": "입력하신 위치 기준으로 계산된 예상 이동시간이며, 실제와 다를 수 있습니다.",
-        }
+    return {
+        "ai_recommended": ai_recommended,
+        "more_places": more_places,
+        "travel_time_disclaimer": "입력하신 위치 기준으로 계산된 예상 이동시간이며, 실제와 다를 수 있습니다.",
+    }
