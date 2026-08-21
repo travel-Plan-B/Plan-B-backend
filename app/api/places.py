@@ -33,6 +33,8 @@ async def search_places(
             name=place["name"], lat=place["lat"], lng=place["lng"]
         )
         place["image_url"] = google_data["image_url"] if google_data else None
+        place["rating"] = google_data["rating"] if google_data else None
+        place["user_rating_count"] = google_data["user_rating_count"] if google_data else None
         return place
 
     enriched_places = await asyncio.gather(*[attach_image(p) for p in normalized_list])
