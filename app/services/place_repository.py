@@ -205,6 +205,7 @@ async def get_detail_recommendations(
             "address": item.get("addr1"),
             "category_tag": category_tag,
             "is_indoor": is_indoor,
+            "image_url": item.get("firstimage") or None,
             "rating": rating,
             "user_rating_count": user_rating_count,
             "parking_status": parking_status,
