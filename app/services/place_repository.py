@@ -16,7 +16,10 @@ from app.services.category_map import (
 )
 from app.services.google_places_service import enrich_with_google_rating
 from app.services.kakao_mobility_service import get_travel_time
-from app.services.tourapi_service import fetch_tourapi_places_by_category
+from app.services.tourapi_service import (
+    fetch_tourapi_places_by_category,
+    fetch_tourapi_places_expanding,
+)
 from app.services.weather_service import get_current_weather, latlng_to_grid
 
 STALE_DAYS = 30
@@ -68,35 +71,91 @@ def _normalize_name(name: str | None) -> str:
     return (name or "").replace(" ", "")
 
 
-async def get_similar_places(db, place_id: str, source: str) -> tuple[list[dict], int]:
+def _is_same_place(
+    candidate_name,
+    candidate_lat,
+    candidate_lng,
+    original_name,
+    original_lat,
+    original_lng,
+    max_distance_m=50,
+) -> bool:
+    """이름이 같거나, 좌표가 아주 가까우면(기본 50m 이내) 같은 장소로 판단."""
+    if _normalize_name(candidate_name) == _normalize_name(original_name):
+        return True
+
+    distance_km = (
+        (candidate_lat - original_lat) ** 2 + (candidate_lng - original_lng) ** 2
+    ) ** 0.5 * 111
+    distance_m = distance_km * 1000
+    return distance_m <= max_distance_m
+
+
+async def get_similar_places(
+    db, place_id: str, source: str, priority: str = "SIMILAR_TO_ORIGINAL"
+) -> tuple[list[dict], int]:
     original = db.query(Place).filter_by(source=source, source_id=place_id).first()
     if original is None:
         return [], 0
 
     category_tag = original.category_tag
 
-    if category_tag in CATEGORY_TAG_TO_CAT3:
-        content_type_id = "39"
+    if priority == "EXPLORE_NEW":
+        # 카테고리 무관하게 넓게 검색 (심플탭 로직 재사용)
+        raw_places, used_radius = await fetch_tourapi_places_expanding(
+            original.lat, original.lng, target_count=30
+        )
+        places = raw_places
+
+        places = [
+            p
+            for p in places
+            if (
+                TOURAPI_CAT3_CATEGORY_MAP.get(p.get("cat3"))
+                or TOURAPI_CONTENTTYPE_MAP.get(p.get("contenttypeid"))
+            )
+            is not None
+        ]
+
+        # 같은 카테고리는 오히려 제외해서 "새로운 느낌"을 강조
+        places = [
+            p
+            for p in places
+            if (
+                TOURAPI_CAT3_CATEGORY_MAP.get(p.get("cat3"))
+                or TOURAPI_CONTENTTYPE_MAP.get(p.get("contenttypeid"))
+            )
+            != category_tag
+        ]
     else:
-        content_type_id = CATEGORY_TAG_TO_CONTENTTYPE.get(category_tag)
+        if category_tag in CATEGORY_TAG_TO_CAT3:
+            content_type_id = "39"
+        else:
+            content_type_id = CATEGORY_TAG_TO_CONTENTTYPE.get(category_tag)
 
-    if content_type_id is None:
-        return [], 0
+        if content_type_id is None:
+            return [], 0
 
-    places, used_radius = await fetch_tourapi_places_by_category(
-        lat=original.lat, lng=original.lng, content_type_id=content_type_id, target_count=30
-    )
+        places, used_radius = await fetch_tourapi_places_by_category(
+            lat=original.lat, lng=original.lng, content_type_id=content_type_id, target_count=30
+        )
 
-    if category_tag in CATEGORY_TAG_TO_CAT3:
-        target_cat3 = CATEGORY_TAG_TO_CAT3[category_tag]
-        places = [p for p in places if p.get("cat3") == target_cat3]
+        if category_tag in CATEGORY_TAG_TO_CAT3:
+            target_cat3 = CATEGORY_TAG_TO_CAT3[category_tag]
+            places = [p for p in places if p.get("cat3") == target_cat3]
 
-    # 블랙리스트에 걸리는 세부 카테고리 제외 (종교시설, 복지시설 등)
     places = [p for p in places if p.get("cat3") not in TOURAPI_CAT3_EXCLUDE]
-
-    # 원본 장소 자기 자신은 후보에서 제외
     places = [
-        p for p in places if _normalize_name(p.get("title")) != _normalize_name(original.name)
+        p
+        for p in places
+        if not _is_same_place(
+            p.get("title"),
+            float(p.get("mapy", 0)),
+            float(p.get("mapx", 0)),
+            original.name,
+            original.lat,
+            original.lng,
+        )
     ]
 
     return places, used_radius
@@ -143,7 +202,7 @@ async def get_detail_recommendations(
     if weather_info:
         is_bad_weather = weather_info["sky_condition"] in ("RAIN", "RAIN_SNOW", "SNOW", "SHOWER")
 
-    raw_places, _ = await get_similar_places(db, place_id, source)
+    raw_places, _ = await get_similar_places(db, place_id, source, priority=priority)
     # 여기서 자르지 않고, 최대한 많이(30개) 가져와서 아래 필터링을 거친 후에 자름
 
     async def enrich(item: dict) -> dict:
