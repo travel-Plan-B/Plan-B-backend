@@ -3,7 +3,6 @@ from pydantic import BaseModel
 
 from app.services.kakao_mobility_service import get_travel_time
 from app.services.time_service import validate_time_conflict
-from app.services.kakao_mobility_service import get_travel_time
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
