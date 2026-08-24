@@ -33,11 +33,7 @@ def estimate_walking_distance_and_time(
     return distance_km, minutes
 
 
-async def get_travel_time(
-    origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float, transport: str = "CAR"
-) -> dict | None:
-    """두 좌표 간 이동시간(분)과 거리 계산.
-    자동차: 카카오모빌리티 실제 경로 API. 도보: 직선거리 기준 추정치(estimated=True)."""
+async def get_travel_time(origin_lat, origin_lng, dest_lat, dest_lng, transport="CAR"):
     if transport == "WALK":
         distance_km, minutes = estimate_walking_distance_and_time(
             origin_lat, origin_lng, dest_lat, dest_lng
@@ -56,10 +52,17 @@ async def get_travel_time(
         "priority": "RECOMMEND",
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        res = await client.get(DIRECTIONS_URL, headers=headers, params=params)
-        res.raise_for_status()
-        data = res.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(DIRECTIONS_URL, headers=headers, params=params)
+            res.raise_for_status()
+            data = res.json()
+    except httpx.HTTPStatusError as e:
+        print(f"[카카오모빌리티 실패] {e.response.status_code}: {e.response.text}")
+        return None
+    except Exception as e:
+        print(f"[카카오모빌리티 실패] {type(e).__name__}: {e}")
+        return None
 
     routes = data.get("routes", [])
     if not routes or routes[0].get("result_code") != 0:
