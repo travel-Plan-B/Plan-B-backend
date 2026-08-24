@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from app.services.kakao_mobility_service import get_travel_time
 from app.services.time_service import validate_time_conflict
+from app.services.kakao_mobility_service import get_travel_time
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
@@ -26,6 +27,12 @@ class ValidateRequest(BaseModel):
     transport: str = "CAR"
 
 
+class TravelTimeRequest(BaseModel):
+    origin: Location
+    destination: Location
+    transport: str = "CAR"
+
+
 @router.post("/validate")
 async def validate_schedule(request: ValidateRequest):
     travel_result = await get_travel_time(
@@ -45,3 +52,30 @@ async def validate_schedule(request: ValidateRequest):
     )
 
     return {"success": True, "data": result}
+
+
+@router.post("/travel-time")
+async def calculate_travel_time(request: TravelTimeRequest):
+    result = await get_travel_time(
+        request.origin.lat,
+        request.origin.lng,
+        request.destination.lat,
+        request.destination.lng,
+        transport=request.transport,
+    )
+
+    if result is None:
+        return {
+            "success": False,
+            "error": {"code": "ROUTE_NOT_FOUND", "message": "경로를 찾을 수 없습니다."},
+        }
+
+    return {
+        "success": True,
+        "data": {
+            "travel_minutes": result["travel_minutes"],
+            "distance": result["distance"],
+            "distance_km": result["distance_km"],
+            "estimated": result["estimated"],
+        },
+    }
