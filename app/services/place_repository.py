@@ -284,6 +284,10 @@ async def get_detail_recommendations(
 
     enriched = await asyncio.gather(*[enrich(p) for p in raw_places])
 
+    print(
+        f"[DEBUG] 필터 전 {len(enriched)}개, 거리들: {[p.get('distance_from_prev_km') for p in enriched]}"
+    )
+
     MAX_DISTANCE_KM = 10
     enriched = [
         p
