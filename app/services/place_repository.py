@@ -273,6 +273,7 @@ async def get_detail_recommendations(
 
         return {
             "place_id": item.get("contentid"),
+            "source": "tourapi",
             "name": item.get("title"),
             "address": item.get("addr1"),
             "category_tag": category_tag,

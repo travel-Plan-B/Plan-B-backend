@@ -118,3 +118,71 @@ async def enrich_with_google_rating(
         "open_now": open_now,
         "image_url": image_url,
     }
+
+
+async def get_place_details_from_google(
+    name: str, lat: float, lng: float, max_distance_km: float = 1.0
+) -> dict | None:
+    """상세페이지용 Google Places 정보 조회.
+    enrich_with_google_rating과 조회 방식(이름+좌표 Text Search)은 동일하되,
+    상세페이지에 필요한 필드(영업상태/전화/홈페이지/지도링크/사진 여러 장)를 추가로 받아온다."""
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": settings.GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": "places.displayName,"
+        "places.rating,"
+        "places.userRatingCount,"
+        "places.location,"
+        "places.parkingOptions,"
+        "places.regularOpeningHours,"
+        "places.businessStatus,"
+        "places.nationalPhoneNumber,"
+        "places.websiteUri,"
+        "places.googleMapsUri,"
+        "places.photos",
+    }
+    body = {
+        "textQuery": name,
+        "locationBias": {
+            "circle": {"center": {"latitude": lat, "longitude": lng}, "radius": 500.0}
+        },
+        "languageCode": "ko",
+        "maxResultCount": 1,
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.post(TEXT_SEARCH_URL, headers=headers, json=body)
+        res.raise_for_status()
+        data = res.json()
+
+    places = data.get("places", [])
+    if not places:
+        return None
+
+    top = places[0]
+    google_lat = top.get("location", {}).get("latitude")
+    google_lng = top.get("location", {}).get("longitude")
+
+    if google_lat is None or google_lng is None:
+        return None
+
+    distance = ((lat - google_lat) ** 2 + (lng - google_lng) ** 2) ** 0.5 * 111
+    if distance > max_distance_km:
+        return None
+
+    operating_hours, open_now = _format_operating_hours(top.get("regularOpeningHours"))
+
+    photos = top.get("photos", [])[:5]
+    image_urls = [build_photo_url(p.get("name")) for p in photos]
+
+    return {
+        "business_status": top.get("businessStatus"),
+        "business_hours": operating_hours,
+        "open_now": open_now,
+        "phone": top.get("nationalPhoneNumber"),
+        "homepage_url": top.get("websiteUri"),
+        "place_url": top.get("googleMapsUri"),
+        "image_urls": image_urls,
+        "rating": top.get("rating"),
+        "user_rating_count": top.get("userRatingCount"),
+    }

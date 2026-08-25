@@ -114,6 +114,7 @@ def sort_places(places, sort_option: str = "RECOMMENDED"):
 def place_to_dict(p, recommend_reason: str | None = None) -> dict:
     return {
         "place_id": p.source_id,
+        "source": p.source,
         "name": p.name,
         "category_tag": p.category_tag,
         "is_indoor": p.is_indoor,

@@ -5,7 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.ingest_places import upsert_place
-from app.services.google_places_service import enrich_with_google_rating
+from app.models.place import Place
+from app.services.google_places_service import (
+    enrich_with_google_rating,
+    get_place_details_from_google,
+)
 from app.services.kakao_service import search_kakao_place
 from app.services.normalize_service import normalize_kakao_place
 
@@ -47,4 +51,48 @@ async def search_places(
     return {
         "count": len(enriched_places),
         "places": enriched_places,
+    }
+
+
+@router.get("/{place_id}")
+async def get_place_detail(
+    place_id: str,
+    source: str = Query(..., description="tourapi 또는 kakao"),
+    db: Session = Depends(get_db),
+):
+    """추천 목록에서 장소 클릭 시 상세페이지에 필요한 정보 조회."""
+    place = db.query(Place).filter_by(source=source, source_id=place_id).first()
+    if place is None:
+        return {"success": False, "error": "PLACE_NOT_FOUND"}
+
+    google_detail = await get_place_details_from_google(
+        name=str(place.name), lat=float(place.lat), lng=float(place.lng)
+    )
+
+    return {
+        "success": True,
+        "data": {
+            "place_id": place.source_id,
+            "name": place.name,
+            "category_tag": place.category_tag,
+            "address": place.address,
+            "description": place.description,
+            "lat": place.lat,
+            "lng": place.lng,
+            "rating": float(place.rating) if place.rating is not None else None,
+            "user_rating_count": place.user_rating_count,
+            "operating_hours": place.operating_hours,
+            "parking_available": place.parking_available,
+            "parking_status": place.parking_status,
+            "image_urls": (
+                google_detail["image_urls"]
+                if google_detail
+                else ([place.image_url] if place.image_url else [])
+            ),
+            "business_status": google_detail["business_status"] if google_detail else None,
+            "business_hours": google_detail["business_hours"] if google_detail else None,
+            "phone": google_detail["phone"] if google_detail else None,
+            "homepage_url": google_detail["homepage_url"] if google_detail else None,
+            "place_url": google_detail["place_url"] if google_detail else None,
+        },
     }
