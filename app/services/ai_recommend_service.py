@@ -47,7 +47,7 @@ async def get_ai_final_pick(
 이유를 쓸 때 지켜야 할 것:
 - 이유는 배열 형태로, 문장 2~3개로 나눠서 작성할 것 (한 문장에 다 몰아넣지 말 것)
 - 공감이나 위로하는 표현("아쉬우시겠지만", "안타깝지만" 등)은 쓰지 말 것
-- 이동시간을 언급할 때는 반드시 후보 목록에 있는 travel_time 값을 그대로 인용할 것, 숫자를 임의로 바꾸지 말 것
+- 이동시간을 언급할 때는 반드시 위 후보 목록에 적힌 숫자를 그대로 사용할 것 (분 단위), 임의로 바꾸지 말 것
 - 애매한 표현("좋은 평점") 대신, 실제 평점 수치를 근거로 들 것 (예: "평점 4.7점")
 - 부자연스럽거나 어색한 단어 선택 주의 (예: "충동적으로" 같은 부정적 뉘앙스 단어는 부적절)
 - 담백하고 명확한 존댓말로, 각 문장은 짧고 간결하게 작성할 것
@@ -58,7 +58,7 @@ async def get_ai_final_pick(
   {{"place_id": "...", "reason": ["이유 문장1", "이유 문장2"]}},
   {{"place_id": "...", "reason": ["이유 문장1", "이유 문장2", "이유 문장3"]}}
 ]"""
-    ...  # 나머지 로직(API 호출, 파싱)은 기존과 동일
+    ...
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -79,15 +79,13 @@ async def get_ai_final_pick(
             data = res.json()
             raw_text = data["content"][0]["text"]
 
-            match = re.search(r"\[.*\]", raw_text, re.DOTALL)
-            if not match:
-                print(f"[AI 응답에서 JSON 배열을 못 찾음] {raw_text!r}")
-                return None
-
+        match = re.search(r"\[.*\]", raw_text, re.DOTALL)
+        if match:
             return json.loads(match.group())
 
         cleaned = raw_text.strip().removeprefix("```json").removesuffix("```").strip()
         return json.loads(cleaned)
+
     except httpx.HTTPStatusError as e:
         print(f"[AI 호출 실패] 상태코드={e.response.status_code}")
         print(f"[AI 응답 본문] {e.response.text}")

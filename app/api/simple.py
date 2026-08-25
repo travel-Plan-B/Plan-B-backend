@@ -8,6 +8,7 @@ from app.services.kakao_mobility_service import get_travel_time
 from app.services.place_repository import get_or_ingest_places
 from app.services.simple_service import (
     enrich_with_travel_time,
+    exclude_same_place,
     filter_by_category_whitelist,
     filter_by_duration_simple,
     place_to_dict,
@@ -25,6 +26,8 @@ class Location(BaseModel):
 
 
 class SimpleRecommendRequest(BaseModel):
+    place_id: str | None = None
+    source: str | None = None
     current_location: Location
     next_place: Location | None = None
     deadline_time: str
@@ -33,6 +36,7 @@ class SimpleRecommendRequest(BaseModel):
     problem_reason: str
     situational_answer: str | None = None
     sort: str = "RECOMMENDED"
+    exclude_place_name: str | None = None
 
 
 @router.post("/recommendations")
@@ -67,6 +71,20 @@ async def recommend_simple(request: SimpleRecommendRequest, db: Session = Depend
 
     places = await get_or_ingest_places(
         db, lat=request.current_location.lat, lng=request.current_location.lng
+    )
+
+    if request.place_id and request.source:
+        places = [
+            p
+            for p in places
+            if not (p.source == request.source and p.source_id == request.place_id)
+        ]
+
+    places = exclude_same_place(
+        places,
+        request.exclude_place_name,
+        request.current_location.lat,
+        request.current_location.lng,
     )
 
     # 날씨를 명시적으로 선택 안 한 경우, 실제 날씨를 참고해서 자동 판단
