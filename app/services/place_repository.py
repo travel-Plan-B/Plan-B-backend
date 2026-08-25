@@ -32,6 +32,18 @@ def _bounding_box(lat: float, lng: float, radius_km: float):
     return lat - lat_delta, lat + lat_delta, lng - lng_delta, lng + lng_delta
 
 
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """두 좌표 간 직선거리(km)."""
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    )
+    return 2 * R * math.asin(math.sqrt(a))
+
+
 async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10) -> list[Place]:
     lat_min, lat_max, lng_min, lng_max = _bounding_box(lat, lng, radius_km)
     stale_cutoff = datetime.utcnow() - timedelta(days=STALE_DAYS)
@@ -213,6 +225,7 @@ async def get_detail_recommendations(
         distance_from_prev = None
         distance_from_prev_km = None
         distance_to_next = None
+        distance_from_original_km = _haversine_km(lat, lng, original.lat, original.lng)
 
         if prev_location:
             result = await get_travel_time(
@@ -276,6 +289,7 @@ async def get_detail_recommendations(
             "distance_from_prev": distance_from_prev,
             "distance_from_prev_km": distance_from_prev_km,
             "distance_to_next": distance_to_next,
+            "distance_from_original_km": distance_from_original_km,
             "estimated_duration_minutes": (
                 get_default_duration(category_tag) if category_tag else 30
             ),
@@ -292,7 +306,8 @@ async def get_detail_recommendations(
     enriched = [
         p
         for p in enriched
-        if p.get("distance_from_prev_km") is None or p["distance_from_prev_km"] <= MAX_DISTANCE_KM
+        if p.get("distance_from_original_km") is None
+        or p["distance_from_original_km"] <= MAX_DISTANCE_KM
     ]
 
     if problem_reason == "WEATHER" and situational_answer in ("OUTDOOR_ONLY", "BOTH"):
