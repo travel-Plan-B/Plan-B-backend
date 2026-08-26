@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     TOUR_API_KEY: str = ""
     GOOGLE_PLACES_API_KEY: str = ""
     CLAUDE_API_KEY: str = ""
+    ODSAY_API_KEY: str
 
     class Config:
         env_file = ".env"

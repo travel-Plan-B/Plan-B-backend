@@ -3,7 +3,7 @@ import math
 from datetime import datetime, timedelta
 
 from app.core.category_duration import get_default_duration
-from app.ingest_places import ingest
+from app.ingest_places import ingest, upsert_place
 from app.models.place import Place
 from app.services.ai_recommend_service import get_ai_final_pick
 from app.services.category_map import (
@@ -16,6 +16,7 @@ from app.services.category_map import (
 )
 from app.services.google_places_service import enrich_with_google_rating
 from app.services.kakao_mobility_service import get_travel_time
+from app.services.normalize_service import normalize_tourapi_place
 from app.services.tourapi_service import (
     fetch_tourapi_places_by_category,
     fetch_tourapi_places_expanding,
@@ -169,6 +170,13 @@ async def get_similar_places(
             original.lng,
         )
     ]
+
+    for item in places:
+        normalized = normalize_tourapi_place(item)
+        if normalized is None:
+            continue
+        upsert_place(db, normalized)
+    db.commit()
 
     return places, used_radius
 
