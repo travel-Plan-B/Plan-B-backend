@@ -45,6 +45,13 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
+def _format_distance(km: float) -> str:
+    """km 단위 거리를 사람이 읽기 좋은 문자열로 변환. 1km 미만은 m 단위."""
+    if km < 1:
+        return f"{round(km * 1000)}m"
+    return f"{round(km, 1)}km"
+
+
 async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10) -> list[Place]:
     lat_min, lat_max, lng_min, lng_max = _bounding_box(lat, lng, radius_km)
     stale_cutoff = datetime.utcnow() - timedelta(days=STALE_DAYS)
@@ -298,7 +305,7 @@ async def get_detail_recommendations(
             "distance_from_prev": distance_from_prev,
             "distance_from_prev_km": distance_from_prev_km,
             "distance_to_next": distance_to_next,
-            "distance_from_original_km": distance_from_original_km,
+            "distance_from_original": _format_distance(distance_from_original_km),
             "estimated_duration_minutes": (
                 get_default_duration(category_tag) if category_tag else 30
             ),
