@@ -257,11 +257,28 @@ async def get_detail_recommendations(
             travel_to_next = result["travel_minutes"] if result else None
             distance_to_next = result["distance"] if result else None
 
-        google_data = await enrich_with_google_rating(name=item.get("title"), lat=lat, lng=lng)
-        rating = google_data["rating"] if google_data else None
-        user_rating_count = google_data["user_rating_count"] if google_data else None
-        parking_status = google_data["parking_status"] if google_data else None
-        operating_hours = google_data["operating_hours"] if google_data else None
+        contentid = item.get("contentid")
+        cached = db.query(Place).filter_by(source="tourapi", source_id=contentid).first()
+        stale_cutoff = datetime.utcnow() - timedelta(days=STALE_DAYS)
+
+        if cached and cached.rating is not None and cached.last_synced_at >= stale_cutoff:
+            rating = float(cached.rating) if cached.rating is not None else None
+            user_rating_count = cached.user_rating_count
+            parking_status = cached.parking_status
+            operating_hours = cached.operating_hours
+        else:
+            google_data = await enrich_with_google_rating(name=item.get("title"), lat=lat, lng=lng)
+            rating = google_data["rating"] if google_data else None
+            user_rating_count = google_data["user_rating_count"] if google_data else None
+            parking_status = google_data["parking_status"] if google_data else None
+            operating_hours = google_data["operating_hours"] if google_data else None
+
+            if google_data and cached:
+                cached.rating = rating
+                cached.user_rating_count = user_rating_count
+                cached.parking_status = parking_status
+                cached.operating_hours = operating_hours
+                cached.last_synced_at = datetime.utcnow()
 
         cat3 = item.get("cat3")
         category_tag = TOURAPI_CAT3_CATEGORY_MAP.get(cat3) or TOURAPI_CONTENTTYPE_MAP.get(
@@ -275,7 +292,6 @@ async def get_detail_recommendations(
             duration = get_default_duration(category_tag) if category_tag else 30
             total_before_next_travel = travel_from_prev + duration
             # current_time에서 total_before_next_travel만큼 지난 시각과 next_item_start_time의 차이
-            from datetime import datetime, timedelta
 
             fmt = "%H:%M"
             start = datetime.strptime(current_time, fmt) + timedelta(
@@ -306,6 +322,7 @@ async def get_detail_recommendations(
             "distance_from_prev_km": distance_from_prev_km,
             "distance_to_next": distance_to_next,
             "distance_from_original": _format_distance(distance_from_original_km),
+            "distance_from_original_km": distance_from_original_km,
             "estimated_duration_minutes": (
                 get_default_duration(category_tag) if category_tag else 30
             ),
