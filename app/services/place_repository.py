@@ -59,6 +59,7 @@ async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10
     existing = (
         db.query(Place)
         .filter(
+            Place.source == "tourapi",
             Place.lat.between(lat_min, lat_max),
             Place.lng.between(lng_min, lng_max),
             Place.last_synced_at >= stale_cutoff,
@@ -79,6 +80,7 @@ async def get_or_ingest_places(db, lat: float, lng: float, radius_km: float = 10
     return (
         db.query(Place)
         .filter(
+            Place.source == "tourapi",
             Place.lat.between(lat_min, lat_max),
             Place.lng.between(lng_min, lng_max),
         )
