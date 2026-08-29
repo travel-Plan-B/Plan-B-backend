@@ -389,4 +389,6 @@ async def get_detail_recommendations(
         ai_recommended = enriched[:3]
         more_places = enriched[3:]
 
+    db.commit()
+
     return {"ai_recommended": ai_recommended, "more_places": more_places}
