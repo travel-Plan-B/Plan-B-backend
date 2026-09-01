@@ -157,10 +157,17 @@ async def get_place_details_from_google(
         "maxResultCount": 1,
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        res = await client.post(TEXT_SEARCH_URL, headers=headers, json=body)
-        res.raise_for_status()
-        data = res.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(TEXT_SEARCH_URL, headers=headers, json=body)
+            res.raise_for_status()
+            data = res.json()
+    except httpx.HTTPStatusError as e:
+        print(f"[GOOGLE PLACES ERROR] {e.response.status_code}: {e.response.text[:200]}")
+        return None
+    except Exception as e:
+        print(f"[GOOGLE PLACES ERROR] {type(e).__name__}: {e}")
+        return None
 
     places = data.get("places", [])
     if not places:
